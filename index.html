@@ -429,6 +429,17 @@
   .mode-toggle button:not([aria-pressed="true"]):hover {
     color: var(--ink);
   }
+
+  /* The Easy/Medium/Hard picker. It reuses every .mode-toggle button
+     style above (same class is on the HTML element) so it looks like
+     one consistent pill-switch family; this rule only controls whether
+     it's shown at all. Hidden by default, revealed by adding "visible"
+     — same show/hide pattern as .btn.visible on the "Next round" button
+     — because it only makes sense once "Vs. computer" is selected (see
+     setMode() in the JS, which toggles this class). */
+  .difficulty-toggle { display: none; }
+  .difficulty-toggle.visible { display: inline-flex; }
+
   /* Accessibility: a visible outline whenever any of these interactive
      elements is reached by keyboard (Tab key), not by mouse click.
      :focus-visible is what makes that mouse/keyboard distinction —
@@ -797,6 +808,15 @@
       <button type="button" id="modeCPU" aria-pressed="false">Vs. computer</button>
     </div>
 
+    <!-- Only meaningful in "Vs. computer" mode, so it starts without
+         the "visible" class — setMode() below adds/removes it whenever
+         the mode changes. Medium is the default difficulty. -->
+    <div class="mode-toggle difficulty-toggle" role="group" aria-label="Computer difficulty" id="difficultyToggle">
+      <button type="button" id="diffEasy" aria-pressed="false">Easy</button>
+      <button type="button" id="diffMedium" aria-pressed="true">Medium</button>
+      <button type="button" id="diffHard" aria-pressed="false">Hard</button>
+    </div>
+
     <!-- "X's turn to draw" / "O wins this round" / etc. Updated by JS
          (updateStatus() and endRound()) as the game progresses. -->
     <div class="status-row">
@@ -924,10 +944,13 @@
   // current: whose turn it is right now, 'X' or 'O'.
   // gameOver: true once the current round has been won or drawn.
   // mode: 'friend' (local two-player) or 'cpu' (vs. the computer).
+  // difficulty: 'easy' | 'medium' | 'hard' — only relevant when
+  //             mode === 'cpu'; see computerMove() for what each does.
   // cpuThinking: true while the computer's move is "pending" (see the
   //              setTimeout in placeMark()), used to ignore clicks
   //              during that pause.
   var board, current, gameOver, mode, cpuThinking;
+  var difficulty = 'medium';
   var scores = { X: 0, O: 0, D: 0 };
 
   // --- Cached element references ----------------------------------------
@@ -960,6 +983,10 @@
   var resetBtn = document.getElementById('resetBtn');
   var modeFriendBtn = document.getElementById('modeFriend');
   var modeCPUBtn = document.getElementById('modeCPU');
+  var difficultyToggle = document.getElementById('difficultyToggle');
+  var diffEasyBtn = document.getElementById('diffEasy');
+  var diffMediumBtn = document.getElementById('diffMedium');
+  var diffHardBtn = document.getElementById('diffHard');
   var scoreXEl = document.getElementById('scoreX');
   var scoreOEl = document.getElementById('scoreO');
   var scoreDEl = document.getElementById('scoreD');
@@ -1187,7 +1214,7 @@
       cellButtons.forEach(function (b) { if (!b.disabled) b.disabled = true; });
       setTimeout(function () {
         cpuThinking = false;
-        var move = bestMove(board);
+        var move = computerMove(board);
         if (move !== -1) placeMark(move, 'O');
         // Re-enable whatever cells are still empty for the human's turn
         // (placeMark's own btn.disabled = true above only handled the
@@ -1211,7 +1238,54 @@
     placeMark(idx, current);
   }
 
-  // --- The computer opponent: minimax search ----------------------------
+  // --- The computer opponent -------------------------------------------
+  // Three difficulty levels, each a separate strategy for picking O's
+  // next move. computerMove() at the bottom of this section is the one
+  // entry point placeMark() actually calls — it just dispatches to
+  // whichever of the three matches the current `difficulty`.
+
+  // Easy: no strategy at all — a uniformly random empty cell. Loses
+  // often, including to moves a beginner wouldn't even plan on purpose.
+  function randomMove(b) {
+    var empties = [];
+    for (var i = 0; i < 9; i++) {
+      if (!b[i]) empties.push(i);
+    }
+    return empties[Math.floor(Math.random() * empties.length)];
+  }
+
+  // Shared helper: is there a single move `player` could make right now
+  // that would immediately win the game? Tries each empty cell, checks
+  // the result, then undoes it — the same "try it, check it, undo it"
+  // pattern minimax() uses below, just one move deep instead of a full
+  // search. Returns that cell's index, or -1 if no such move exists.
+  function findWinningMove(b, player) {
+    for (var i = 0; i < 9; i++) {
+      if (!b[i]) {
+        b[i] = player;
+        var result = checkResult(b);
+        b[i] = null;
+        if (result && result.winner === player) return i;
+      }
+    }
+    return -1;
+  }
+
+  // Medium: a simple, human-like rule of thumb rather than a full
+  // search — "take a win if it's sitting right there, otherwise block
+  // the human if they've got one, otherwise just play somewhere empty."
+  // That's enough to feel like a real opponent (it won't hand you a win
+  // by accident) without being unbeatable, since it never plans further
+  // than one move ahead and can still be out-maneuvered a few moves out.
+  function mediumMove(b) {
+    var winningMove = findWinningMove(b, 'O');
+    if (winningMove !== -1) return winningMove;
+    var blockingMove = findWinningMove(b, 'X');
+    if (blockingMove !== -1) return blockingMove;
+    return randomMove(b);
+  }
+
+  // Hard: full minimax search below — perfect play, never loses.
   // Minimax is the standard algorithm for "perfect play" in small
   // two-player games like this one. The idea: imagine every possible
   // way the rest of the game could unfold from a given board, assuming
@@ -1270,15 +1344,37 @@
     return move;
   }
 
+  // The one function placeMark() actually calls for the computer's
+  // turn — picks a strategy based on the current `difficulty` and
+  // hands back a cell index.
+  function computerMove(b) {
+    if (difficulty === 'easy') return randomMove(b);
+    if (difficulty === 'medium') return mediumMove(b);
+    return bestMove(b); // 'hard'
+  }
+
   // Switches between "Two players" and "Vs. computer", updates which
-  // toggle button looks pressed, and starts a brand new match (this
+  // toggle button looks pressed, shows/hides the difficulty picker
+  // (only meaningful in "cpu" mode), and starts a brand new match (this
   // also resets the scoreboard — switching modes mid-match wouldn't
   // make sense to carry a score across).
   function setMode(newMode) {
     mode = newMode;
     modeFriendBtn.setAttribute('aria-pressed', String(mode === 'friend'));
     modeCPUBtn.setAttribute('aria-pressed', String(mode === 'cpu'));
+    difficultyToggle.classList.toggle('visible', mode === 'cpu');
     resetMatch();
+  }
+
+  // Switches the computer's difficulty, updates which toggle button
+  // looks pressed, and starts a fresh round so the change never applies
+  // mid-round (the scoreboard is left alone, unlike setMode() above).
+  function setDifficulty(newDifficulty) {
+    difficulty = newDifficulty;
+    diffEasyBtn.setAttribute('aria-pressed', String(difficulty === 'easy'));
+    diffMediumBtn.setAttribute('aria-pressed', String(difficulty === 'medium'));
+    diffHardBtn.setAttribute('aria-pressed', String(difficulty === 'hard'));
+    resetRound();
   }
 
   // --- Wire everything up ------------------------------------------
@@ -1288,6 +1384,9 @@
   // and element reference used below has already been declared above.
   modeFriendBtn.addEventListener('click', function () { if (mode !== 'friend') setMode('friend'); });
   modeCPUBtn.addEventListener('click', function () { if (mode !== 'cpu') setMode('cpu'); });
+  diffEasyBtn.addEventListener('click', function () { if (difficulty !== 'easy') setDifficulty('easy'); });
+  diffMediumBtn.addEventListener('click', function () { if (difficulty !== 'medium') setDifficulty('medium'); });
+  diffHardBtn.addEventListener('click', function () { if (difficulty !== 'hard') setDifficulty('hard'); });
   nextRoundBtn.addEventListener('click', resetRound);
   resetBtn.addEventListener('click', resetMatch);
 
