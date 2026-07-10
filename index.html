@@ -701,8 +701,11 @@
   --------------------------------------------------------------------- */
 
   /* The tappable die. It's a <button> (see the HTML) containing one
-     <svg> square with a group of pip <circle>s that JS rewrites every
-     time the face changes — see renderDieFace() in the script. */
+     <svg> square with a numeral <text> element JS overwrites every
+     time the face changes — see renderDieFace() in the script. This is
+     a custom die (six faces showing two each of 0, 1, and 2), not a
+     standard 1-6 die, so a plain numeral reads more clearly than
+     pip-dots would — there's no normal dot pattern for "0". */
   .die {
     appearance: none;
     border: none;
@@ -720,7 +723,13 @@
     stroke: var(--chip-border);
     stroke-width: 2;
   }
-  .die-pip { fill: var(--ink); }
+  .die-number {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-weight: 600;
+    font-size: 44px;
+    fill: var(--ink);
+    user-select: none;
+  }
 
   /* A quick tumble while a roll is in progress (see rollDie() — the
      "rolling" class is added for the duration of the roll and removed
@@ -955,13 +964,14 @@
       <h2>30 Seconds</h2>
     </div>
 
-    <!-- The die's pips (dots) are empty here — JS draws 1-6 of them
-         into #diePips based on the rolled value; see renderDieFace()
-         and rollDie() in the script. -->
+    <!-- A custom die: six faces, but only three distinct numbers (0,
+         1, and 2, each appearing on two faces) — not a standard 1-6
+         die. The numeral text is empty here — JS fills it in based on
+         the rolled value; see renderDieFace() and rollDie(). -->
     <button type="button" class="die" id="dieBtn" aria-label="Tap to roll the die">
       <svg class="die-svg" viewBox="0 0 100 100" aria-hidden="true">
         <rect class="die-frame" x="4" y="4" width="92" height="92" rx="18" />
-        <g id="diePips"></g>
+        <text class="die-number" id="dieNumber" x="50" y="50" text-anchor="middle" dominant-baseline="central"></text>
       </svg>
     </button>
     <p class="die-hint" id="dieHint">tap the die to roll</p>
@@ -1177,7 +1187,7 @@
   var muteBtn = document.getElementById('muteBtn');
   var muteIconUse = document.getElementById('muteIconUse');
   var dieBtn = document.getElementById('dieBtn');
-  var diePipsEl = document.getElementById('diePips');
+  var dieNumberEl = document.getElementById('dieNumber');
   var dieHintEl = document.getElementById('dieHint');
   var timerDisplayEl = document.getElementById('timerDisplay');
   var timerStartBtn = document.getElementById('timerStartBtn');
@@ -1702,44 +1712,32 @@
   }
 
   // --- The die -------------------------------------------------------
-  // Where each face's dots ("pips") sit, as [x, y] positions inside the
-  // die-face SVG's 0-100 coordinate space. Same idea as CELL_CENTERS
-  // near the top of this script, just for a die instead of a board.
-  var DIE_PIPS = {
-    1: [[50, 50]],
-    2: [[30, 30], [70, 70]],
-    3: [[30, 30], [50, 50], [70, 70]],
-    4: [[30, 30], [70, 30], [30, 70], [70, 70]],
-    5: [[30, 30], [70, 30], [50, 50], [30, 70], [70, 70]],
-    6: [[30, 25], [70, 25], [30, 50], [70, 50], [30, 75], [70, 75]]
-  };
+  // This is a custom die, not a standard 1-6 one: it has six faces same
+  // as a normal die, but only three distinct numbers on them — 0, 1,
+  // and 2, each appearing on two of the six faces. Since every number
+  // covers exactly 2 of 6 faces, each is equally likely (2/6 = 1/3
+  // apiece), which is exactly what picking a random whole number from
+  // 0-2 gives — so the roll can be simulated directly from the three
+  // numbers themselves rather than tracking all six faces separately.
 
-  // A random whole number from 1 to 6, same odds for each — the one
-  // place this calculation happens, used by every face change below,
-  // so there's a single source of truth for "what counts as a valid
-  // roll" instead of the same formula copy-pasted at each call site.
-  // Math.random() gives a decimal from 0 up to (but never reaching) 1;
-  // multiplying by 6 spreads that out to 0 up to (not reaching) 6;
-  // Math.floor() then drops the decimal part, leaving a whole number
-  // from 0 to 5; adding 1 shifts that range up to 1-6.
+  // A random whole number from 0 to 2, same 1-in-3 odds for each — the
+  // one place this calculation happens, used by every face change
+  // below, so there's a single source of truth for "what counts as a
+  // valid roll" instead of the same formula copy-pasted at each call
+  // site. Math.random() gives a decimal from 0 up to (but never
+  // reaching) 1; multiplying by 3 spreads that out to 0 up to (not
+  // reaching) 3; Math.floor() then drops the decimal part, leaving a
+  // whole number from 0 to 2.
   function randomDieValue() {
-    return 1 + Math.floor(Math.random() * 6);
+    return Math.floor(Math.random() * 3);
   }
 
-  // Redraws the die's face for a given value (1-6): clears whatever
-  // pips are there now, adds a fresh <circle> for each position in
-  // DIE_PIPS[value], and updates the die's accessible name so screen
-  // reader users hear the result too, not just see it.
+  // Updates the die's face to show `value` as a numeral (not pips —
+  // there's no standard dot pattern for "0", so plain text is clearer
+  // for this die) and updates its accessible name so screen reader
+  // users hear the result too, not just see it.
   function renderDieFace(value) {
-    diePipsEl.innerHTML = '';
-    DIE_PIPS[value].forEach(function (pos) {
-      var circle = document.createElementNS(svgNS, 'circle');
-      circle.setAttribute('cx', pos[0]);
-      circle.setAttribute('cy', pos[1]);
-      circle.setAttribute('r', 7);
-      circle.setAttribute('class', 'die-pip');
-      diePipsEl.appendChild(circle);
-    });
+    dieNumberEl.textContent = value;
     dieBtn.setAttribute('aria-label', 'Die showing ' + value + '. Tap to roll.');
   }
 
@@ -1750,8 +1748,8 @@
   // 90ms (with a tick sound each time) to read as a tumbling roll, then
   // settle on one final random value, independent of whatever face the
   // animation happened to land on, and play a confirming beep. The
-  // hint text spells out the exact number rolled (not just the pips),
-  // so the result is never ambiguous.
+  // hint text spells out the exact number rolled, so the result is
+  // never ambiguous even at a glance.
   function rollDie() {
     if (dieRolling) return;
     dieRolling = true;
@@ -1866,7 +1864,7 @@
   timerResetBtn.addEventListener('click', resetTimer);
 
   // The die starts blank until the first roll, so give it an initial
-  // face to display (a 1) rather than showing an empty square.
-  renderDieFace(1);
+  // face to display (a 0) rather than showing an empty square.
+  renderDieFace(0);
 })(); // end of the IIFE — everything above is now running.
 </script>
