@@ -212,16 +212,19 @@
     justify-content: center;
   }
 
-  /* This page has three "screens", stacked like a simple menu → submenu
+  /* This page has four "screens", stacked like a simple menu → submenu
      → destination flow:
        1. #menuView       — the main hub: three tiles (Mini Games /
                              Board Game Dice / Help).
        2. #miniGamesView  — opened from the "Mini Games" tile; lists
                              the mini games themselves (just Tic-Tac-Toe
                              for now).
-       3. #gameView       — the actual Tic-Tac-Toe game, opened from
+       3. #diceView       — opened from the "Board Game Dice" tile;
+                             same idea, lists dice games (just "30
+                             Seconds" — not built yet — for now).
+       4. #gameView       — the actual Tic-Tac-Toe game, opened from
                              the "Tic-Tac-Toe" tile in #miniGamesView.
-     All three live inside .stage as sibling elements (class="view"),
+     All four live inside .stage as sibling elements (class="view"),
      but only one is shown at a time — JavaScript adds/removes the
      "active" class to switch between them (see showView() in the JS
      section near the bottom of this file). This is a simple hand-rolled
@@ -715,6 +718,10 @@
       <line x1="3" y1="9" x2="21" y2="9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
       <line x1="3" y1="15" x2="21" y2="15" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
     </symbol>
+    <symbol id="icon-clock" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.6" />
+      <path d="M12 7v5l3.2 2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+    </symbol>
     <symbol id="icon-chevron" viewBox="0 0 24 24">
       <path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
     </symbol>
@@ -722,10 +729,11 @@
 </svg>
 
 <div class="stage">
-  <!-- Screen 1: main hub, shown first (has "active"). Three tiles, only
-       "Mini Games" is enabled — the other two are real disabled
-       <button>s (see the .menu-btn comment in the style block for why
-       that's enough to make them unclickable, with no JS involved). -->
+  <!-- Screen 1: main hub, shown first (has "active"). Three tiles:
+       "Mini Games" and "Board Game Dice" are enabled — "Help" is still
+       a real disabled <button> (see the .menu-btn comment in the style
+       block for why that's enough to make it unclickable, with no JS
+       involved). -->
   <div class="view minimal-view active" id="menuView">
     <div class="screen-heading">
       <p class="eyebrow">game hub</p>
@@ -741,12 +749,12 @@
         <span class="menu-btn-chevron" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#icon-chevron"></use></svg></span>
       </button>
 
-      <button type="button" class="menu-btn" disabled>
+      <button type="button" class="menu-btn" id="diceHubBtn">
         <span class="menu-btn-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#icon-dice"></use></svg></span>
         <span class="menu-btn-text">
           <span class="menu-btn-label">Board Game Dice</span>
-          <span class="menu-btn-badge">Coming soon</span>
         </span>
+        <span class="menu-btn-chevron" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#icon-chevron"></use></svg></span>
       </button>
 
       <button type="button" class="menu-btn" disabled>
@@ -781,6 +789,32 @@
           <span class="menu-btn-label">Tic-Tac-Toe</span>
         </span>
         <span class="menu-btn-chevron" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#icon-chevron"></use></svg></span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Screen 2b: Board Game Dice submenu, opened from the "Board Game
+       Dice" tile on the main hub — same shape as the Mini Games
+       submenu above (one menu-list of titles in this category). "30
+       Seconds" isn't built yet, so it's a disabled "Coming soon" tile
+       for now, same pattern as "Help" on the main hub. -->
+  <div class="view minimal-view" id="diceView">
+    <div class="view-topbar">
+      <button type="button" class="link-btn" id="diceBackBtn">&lsaquo; Menu</button>
+    </div>
+
+    <div class="screen-heading">
+      <p class="eyebrow">board game dice</p>
+      <h2>Choose a game</h2>
+    </div>
+
+    <div class="menu-list">
+      <button type="button" class="menu-btn" disabled>
+        <span class="menu-btn-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#icon-clock"></use></svg></span>
+        <span class="menu-btn-text">
+          <span class="menu-btn-label">30 Seconds</span>
+          <span class="menu-btn-badge">Coming soon</span>
+        </span>
       </button>
     </div>
   </div>
@@ -958,18 +992,21 @@
   // looked up once here (by its id) and kept in a variable, rather than
   // re-querying the document every time it's needed.
 
-  // The three screens (see the .view comment in the style block), keyed
+  // The four screens (see the .view comment in the style block), keyed
   // by the same short names used throughout showView() below, plus a
   // flag so the board is only ever built once, the first time the
   // player clicks into the game.
   var views = {
     menu: document.getElementById('menuView'),
     games: document.getElementById('miniGamesView'),
+    dice: document.getElementById('diceView'),
     game: document.getElementById('gameView')
   };
   var miniGamesBtn = document.getElementById('miniGamesBtn');
   var miniGamesBackBtn = document.getElementById('miniGamesBackBtn');
   var ticTacToeBtn = document.getElementById('ticTacToeBtn');
+  var diceHubBtn = document.getElementById('diceHubBtn');
+  var diceBackBtn = document.getElementById('diceBackBtn');
   var backBtn = document.getElementById('backBtn');
   var gameInitialized = false;
 
@@ -1391,10 +1428,13 @@
   resetBtn.addEventListener('click', resetMatch);
 
   // The navigation chain: main hub -> Mini Games -> Tic-Tac-Toe, and
-  // back again. Each line reads as "clicking X shows screen Y".
+  // back again; plus the parallel main hub -> Board Game Dice branch.
+  // Each line reads as "clicking X shows screen Y".
   miniGamesBtn.addEventListener('click', function () { showView('games'); });   // hub -> mini games
   miniGamesBackBtn.addEventListener('click', function () { showView('menu'); }); // mini games -> hub
   ticTacToeBtn.addEventListener('click', function () { showView('game'); });    // mini games -> game
   backBtn.addEventListener('click', function () { showView('games'); });        // game -> mini games
+  diceHubBtn.addEventListener('click', function () { showView('dice'); });      // hub -> board game dice
+  diceBackBtn.addEventListener('click', function () { showView('menu'); });     // board game dice -> hub
 })(); // end of the IIFE — everything above is now running.
 </script>
