@@ -212,19 +212,21 @@
     justify-content: center;
   }
 
-  /* This page has four "screens", stacked like a simple menu → submenu
+  /* This page has five "screens", stacked like a simple menu → submenu
      → destination flow:
-       1. #menuView       — the main hub: three tiles (Mini Games /
-                             Board Game Dice / Help).
-       2. #miniGamesView  — opened from the "Mini Games" tile; lists
-                             the mini games themselves (just Tic-Tac-Toe
-                             for now).
-       3. #diceView       — opened from the "Board Game Dice" tile;
-                             same idea, lists dice games (just "30
-                             Seconds" — not built yet — for now).
-       4. #gameView       — the actual Tic-Tac-Toe game, opened from
-                             the "Tic-Tac-Toe" tile in #miniGamesView.
-     All four live inside .stage as sibling elements (class="view"),
+       1. #menuView          — the main hub: three tiles (Mini Games /
+                                Board Game Dice / Help).
+       2. #miniGamesView     — opened from the "Mini Games" tile; lists
+                                the mini games themselves (just
+                                Tic-Tac-Toe for now).
+       3. #diceView          — opened from the "Board Game Dice" tile;
+                                same idea, lists dice games (just "30
+                                Seconds" for now).
+       4. #gameView          — the actual Tic-Tac-Toe game, opened from
+                                the "Tic-Tac-Toe" tile in #miniGamesView.
+       5. #thirtySecondsView — the 30 Seconds die + timer, opened from
+                                the "30 Seconds" tile in #diceView.
+     All five live inside .stage as sibling elements (class="view"),
      but only one is shown at a time — JavaScript adds/removes the
      "active" class to switch between them (see showView() in the JS
      section near the bottom of this file). This is a simple hand-rolled
@@ -256,6 +258,35 @@
     display: flex;
     justify-content: flex-start;
   }
+  /* Variant used by the 30 Seconds screen, which also has a mute
+     button — pushes the back link and the mute button to opposite ends
+     instead of bunching them both on the left. */
+  .view-topbar.spread {
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  /* Small icon-only toggle for sound on/off. The icon it shows (see
+     the HTML) is swapped between #icon-sound-on and #icon-sound-off by
+     JS whenever it's clicked — see setMuted() in the script. */
+  .mute-btn {
+    appearance: none;
+    width: 2.25rem;
+    height: 2.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--chip-border);
+    border-radius: 0.6rem;
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: color 0.15s ease, border-color 0.15s ease;
+  }
+  .mute-btn svg { width: 1.1rem; height: 1.1rem; }
+  .mute-btn:hover,
+  .mute-btn:focus-visible { color: var(--ink); border-color: var(--muted-2); }
+  .mute-btn[aria-pressed="true"] { color: var(--x-color); }
 
   /* Small eyebrow + heading pair, centered, used atop both minimal screens. */
   .screen-heading {
@@ -451,7 +482,8 @@
   .mode-toggle button:focus-visible,
   .cell:focus-visible,
   .btn:focus-visible,
-  .link-btn:focus-visible {
+  .link-btn:focus-visible,
+  .die:focus-visible {
     outline: 2px dashed var(--x-color);
     outline-offset: 3px;
   }
@@ -629,6 +661,9 @@
   }
   .btn:hover { transform: translateY(-1px); }
   .btn:active { transform: translateY(0); }
+  /* Used by the 30 Seconds screen's "Start" button while the countdown
+     is running, so it can't be clicked twice at once. */
+  .btn:disabled { opacity: 0.55; cursor: default; transform: none; }
 
   /* Plain-text button style used for "Reset match" and "‹ Menu" — a
      hand-drawn underline (the ::after pseudo-element below) sweeps in
@@ -657,6 +692,79 @@
   .link-btn:hover::after,
   .link-btn:focus-visible::after { right: 0; }
   .link-btn:hover { color: var(--ink); }
+
+  /* --- The 30 Seconds screen: die + timer ------------------------------
+     Both components below reuse the same "card" language already used
+     elsewhere (a var(--surface) panel with a var(--chip-border) edge and
+     a soft var(--shadow) lift) so they read as part of the same minimal
+     design system as the menu tiles, just larger and interactive.
+  --------------------------------------------------------------------- */
+
+  /* The tappable die. It's a <button> (see the HTML) containing one
+     <svg> square with a group of pip <circle>s that JS rewrites every
+     time the face changes — see renderDieFace() in the script. */
+  .die {
+    appearance: none;
+    border: none;
+    background: none;
+    padding: 0;
+    width: min(46vw, 9.5rem);
+    aspect-ratio: 1 / 1;
+    cursor: pointer;
+    border-radius: 1rem;
+    filter: drop-shadow(0 8px 18px var(--shadow));
+  }
+  .die-svg { width: 100%; height: 100%; display: block; }
+  .die-frame {
+    fill: var(--surface);
+    stroke: var(--chip-border);
+    stroke-width: 2;
+  }
+  .die-pip { fill: var(--ink); }
+
+  /* A quick tumble while a roll is in progress (see rollDie() — the
+     "rolling" class is added for the duration of the roll and removed
+     once a final value is chosen). prefers-reduced-motion shortens
+     this to nothing automatically via the global rule at the bottom of
+     this style block, no extra work needed here. */
+  @keyframes dieRoll {
+    0%   { transform: rotate(0deg) scale(1); }
+    25%  { transform: rotate(-12deg) scale(1.04); }
+    50%  { transform: rotate(10deg) scale(0.97); }
+    75%  { transform: rotate(-6deg) scale(1.03); }
+    100% { transform: rotate(0deg) scale(1); }
+  }
+  .die.rolling { animation: dieRoll 0.65s ease; }
+
+  .die-hint {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    text-align: center;
+  }
+
+  .timer-panel {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.9rem;
+  }
+  /* Big countdown readout. Monospace + tabular-nums keeps the digits
+     from shifting width as they change (e.g. "0:30" -> "0:09"). */
+  .timer-display {
+    margin: 0;
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-weight: 600;
+    font-size: 3rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+    transition: color 0.2s ease;
+  }
+  /* Briefly applied when the countdown hits 0 (see startTimer()), then
+     removed a moment later — a quick flash of color instead of a
+     permanent state change. */
+  .timer-display.times-up { color: var(--x-color); }
 
   footer {
     font-family: 'IBM Plex Mono', ui-monospace, monospace;
@@ -724,6 +832,16 @@
     </symbol>
     <symbol id="icon-chevron" viewBox="0 0 24 24">
       <path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+    </symbol>
+    <symbol id="icon-sound-on" viewBox="0 0 24 24">
+      <path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor" />
+      <path d="M16 8.5a5 5 0 0 1 0 7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+      <path d="M18.6 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+    </symbol>
+    <symbol id="icon-sound-off" viewBox="0 0 24 24">
+      <path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor" />
+      <line x1="16" y1="9" x2="21" y2="14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+      <line x1="21" y1="9" x2="16" y2="14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
     </symbol>
   </defs>
 </svg>
@@ -795,9 +913,7 @@
 
   <!-- Screen 2b: Board Game Dice submenu, opened from the "Board Game
        Dice" tile on the main hub — same shape as the Mini Games
-       submenu above (one menu-list of titles in this category). "30
-       Seconds" isn't built yet, so it's a disabled "Coming soon" tile
-       for now, same pattern as "Help" on the main hub. -->
+       submenu above (one menu-list of titles in this category). -->
   <div class="view minimal-view" id="diceView">
     <div class="view-topbar">
       <button type="button" class="link-btn" id="diceBackBtn">&lsaquo; Menu</button>
@@ -809,13 +925,53 @@
     </div>
 
     <div class="menu-list">
-      <button type="button" class="menu-btn" disabled>
+      <button type="button" class="menu-btn" id="thirtySecondsBtn">
         <span class="menu-btn-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#icon-clock"></use></svg></span>
         <span class="menu-btn-text">
           <span class="menu-btn-label">30 Seconds</span>
-          <span class="menu-btn-badge">Coming soon</span>
         </span>
+        <span class="menu-btn-chevron" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#icon-chevron"></use></svg></span>
       </button>
+    </div>
+  </div>
+
+  <!-- Screen 2c: the 30 Seconds die + timer, opened from the tile
+       above. Its back link returns to the Board Game Dice submenu,
+       not all the way to the main hub — same "step back one level"
+       rule the Tic-Tac-Toe screen follows below. -->
+  <div class="view minimal-view" id="thirtySecondsView">
+    <div class="view-topbar spread">
+      <button type="button" class="link-btn" id="thirtySecondsBackBtn">&lsaquo; Board Game Dice</button>
+      <!-- aria-pressed reflects the muted state; JS keeps it and the
+           icon (#icon-sound-on / #icon-sound-off) in sync — see
+           setMuted() in the script. -->
+      <button type="button" class="mute-btn" id="muteBtn" aria-pressed="false" aria-label="Mute sound">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><use id="muteIconUse" href="#icon-sound-on"></use></svg>
+      </button>
+    </div>
+
+    <div class="screen-heading">
+      <p class="eyebrow">board game dice</p>
+      <h2>30 Seconds</h2>
+    </div>
+
+    <!-- The die's pips (dots) are empty here — JS draws 1-6 of them
+         into #diePips based on the rolled value; see renderDieFace()
+         and rollDie() in the script. -->
+    <button type="button" class="die" id="dieBtn" aria-label="Tap to roll the die">
+      <svg class="die-svg" viewBox="0 0 100 100" aria-hidden="true">
+        <rect class="die-frame" x="4" y="4" width="92" height="92" rx="18" />
+        <g id="diePips"></g>
+      </svg>
+    </button>
+    <p class="die-hint" id="dieHint">tap the die to roll</p>
+
+    <div class="timer-panel">
+      <p class="timer-display" id="timerDisplay">0:30</p>
+      <div class="controls">
+        <button type="button" class="btn visible" id="timerStartBtn">Start</button>
+        <button type="button" class="link-btn" id="timerResetBtn">Reset</button>
+      </div>
     </div>
   </div>
 
@@ -986,13 +1142,17 @@
   var board, current, gameOver, mode, cpuThinking;
   var difficulty = 'medium';
   var scores = { X: 0, O: 0, D: 0 };
+  // Sound on/off for the 30 Seconds screen's die-roll and horn effects
+  // (see the "Sound effects" section further down). Page-wide rather
+  // than screen-specific in case other sound-making games join later.
+  var muted = false;
 
   // --- Cached element references ----------------------------------------
   // Every interactive or dynamically-updated element in the HTML is
   // looked up once here (by its id) and kept in a variable, rather than
   // re-querying the document every time it's needed.
 
-  // The four screens (see the .view comment in the style block), keyed
+  // The five screens (see the .view comment in the style block), keyed
   // by the same short names used throughout showView() below, plus a
   // flag so the board is only ever built once, the first time the
   // player clicks into the game.
@@ -1000,6 +1160,7 @@
     menu: document.getElementById('menuView'),
     games: document.getElementById('miniGamesView'),
     dice: document.getElementById('diceView'),
+    thirtySeconds: document.getElementById('thirtySecondsView'),
     game: document.getElementById('gameView')
   };
   var miniGamesBtn = document.getElementById('miniGamesBtn');
@@ -1009,6 +1170,18 @@
   var diceBackBtn = document.getElementById('diceBackBtn');
   var backBtn = document.getElementById('backBtn');
   var gameInitialized = false;
+
+  // --- 30 Seconds screen elements ---------------------------------------
+  var thirtySecondsBtn = document.getElementById('thirtySecondsBtn');
+  var thirtySecondsBackBtn = document.getElementById('thirtySecondsBackBtn');
+  var muteBtn = document.getElementById('muteBtn');
+  var muteIconUse = document.getElementById('muteIconUse');
+  var dieBtn = document.getElementById('dieBtn');
+  var diePipsEl = document.getElementById('diePips');
+  var dieHintEl = document.getElementById('dieHint');
+  var timerDisplayEl = document.getElementById('timerDisplay');
+  var timerStartBtn = document.getElementById('timerStartBtn');
+  var timerResetBtn = document.getElementById('timerResetBtn');
 
   var gridLinesEl = document.getElementById('gridLines');
   var marksEl = document.getElementById('marks');
@@ -1414,6 +1587,251 @@
     resetRound();
   }
 
+  // ======================== The 30 Seconds screen ========================
+  // A tappable die and a 30-second countdown timer, with sound effects.
+  // Rather than embedding actual audio files (which would mean either
+  // shipping large binary data like the fonts at the top of this file,
+  // or fetching them from somewhere external — this project deliberately
+  // avoids both), every sound here is *synthesized* in the browser using
+  // the Web Audio API: short snippets of code that generate a raw sound
+  // wave on the fly. It's a different tool than the SVG path-drawing
+  // used for the board game above, but the same idea — draw it with
+  // code instead of loading a pre-made asset.
+
+  // --- Sound effects -----------------------------------------------------
+
+  // A single shared AudioContext — the Web Audio API's entry point,
+  // roughly equivalent to a <canvas> element's 2D drawing context, but
+  // for sound instead of pixels. Browsers require it to be created (or
+  // resumed, if suspended) during a real user action like a click, which
+  // is why this is created lazily on first use rather than at page load.
+  var audioCtx = null;
+  function getAudioContext() {
+    if (!audioCtx) {
+      var AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      audioCtx = new AudioContextClass();
+    }
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    return audioCtx;
+  }
+
+  // Plays a single steady tone: an oscillator (the wave generator) is
+  // connected through a gain node (a volume control) into the speakers
+  // (ctx.destination). The gain is ramped up fast and down slow — an
+  // "envelope" — so the tone fades in and out instead of clicking on
+  // and off abruptly.
+  function playTone(frequency, duration, waveType, peakVolume) {
+    if (muted) return;
+    var ctx = getAudioContext();
+    var now = ctx.currentTime;
+    var oscillator = ctx.createOscillator();
+    var gain = ctx.createGain();
+    oscillator.type = waveType;
+    oscillator.frequency.value = frequency;
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(peakVolume, now + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+    oscillator.connect(gain);
+    gain.connect(ctx.destination);
+    oscillator.start(now);
+    oscillator.stop(now + duration + 0.05);
+  }
+
+  // The short "ready" beep once the die settles on a value.
+  function playBeep() {
+    playTone(880, 0.15, 'sine', 0.25);
+  }
+
+  // One tick of the die "clattering" while it rolls: a burst of white
+  // noise (random static) rather than a musical tone, built by filling
+  // a short audio buffer with random values and fading it out — that
+  // fade is what turns a harsh click into a softer, more percussive
+  // "tock" sound.
+  function playDiceTick() {
+    if (muted) return;
+    var ctx = getAudioContext();
+    var bufferSize = Math.floor(ctx.sampleRate * 0.04); // 40ms of noise
+    var buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    var data = buffer.getChannelData(0);
+    for (var i = 0; i < bufferSize; i++) {
+      data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize); // fade out
+    }
+    var source = ctx.createBufferSource();
+    source.buffer = buffer;
+    var gain = ctx.createGain();
+    gain.gain.value = 0.18;
+    source.connect(gain);
+    gain.connect(ctx.destination);
+    source.start();
+  }
+
+  // The air-horn sound when the timer runs out: two oscillators a few
+  // Hz apart (220Hz and 233Hz) played together. Two tones that close in
+  // pitch interfere with each other as they play, producing a buzzing
+  // "beat" instead of a clean note — that buzz is most of what makes it
+  // read as a brassy horn instead of a plain electronic tone.
+  function playHorn() {
+    if (muted) return;
+    var ctx = getAudioContext();
+    var now = ctx.currentTime;
+    var duration = 1.0;
+    [220, 233].forEach(function (frequency) {
+      var oscillator = ctx.createOscillator();
+      var gain = ctx.createGain();
+      oscillator.type = 'sawtooth';
+      oscillator.frequency.value = frequency;
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(0.22, now + 0.05);
+      gain.gain.setValueAtTime(0.22, now + duration - 0.25);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+      oscillator.connect(gain);
+      gain.connect(ctx.destination);
+      oscillator.start(now);
+      oscillator.stop(now + duration + 0.05);
+    });
+  }
+
+  // Toggles muted, swaps the button's icon between the sound-on and
+  // sound-off symbols (see the icon sprite near the top of the HTML),
+  // and keeps aria-pressed/aria-label in sync for screen readers.
+  function setMuted(newMuted) {
+    muted = newMuted;
+    muteBtn.setAttribute('aria-pressed', String(muted));
+    muteBtn.setAttribute('aria-label', muted ? 'Unmute sound' : 'Mute sound');
+    muteIconUse.setAttribute('href', muted ? '#icon-sound-off' : '#icon-sound-on');
+  }
+
+  // --- The die -------------------------------------------------------
+  // Where each face's dots ("pips") sit, as [x, y] positions inside the
+  // die-face SVG's 0-100 coordinate space. Same idea as CELL_CENTERS
+  // near the top of this script, just for a die instead of a board.
+  var DIE_PIPS = {
+    1: [[50, 50]],
+    2: [[30, 30], [70, 70]],
+    3: [[30, 30], [50, 50], [70, 70]],
+    4: [[30, 30], [70, 30], [30, 70], [70, 70]],
+    5: [[30, 30], [70, 30], [50, 50], [30, 70], [70, 70]],
+    6: [[30, 25], [70, 25], [30, 50], [70, 50], [30, 75], [70, 75]]
+  };
+
+  // A random whole number from 1 to 6, same odds for each — the one
+  // place this calculation happens, used by every face change below,
+  // so there's a single source of truth for "what counts as a valid
+  // roll" instead of the same formula copy-pasted at each call site.
+  // Math.random() gives a decimal from 0 up to (but never reaching) 1;
+  // multiplying by 6 spreads that out to 0 up to (not reaching) 6;
+  // Math.floor() then drops the decimal part, leaving a whole number
+  // from 0 to 5; adding 1 shifts that range up to 1-6.
+  function randomDieValue() {
+    return 1 + Math.floor(Math.random() * 6);
+  }
+
+  // Redraws the die's face for a given value (1-6): clears whatever
+  // pips are there now, adds a fresh <circle> for each position in
+  // DIE_PIPS[value], and updates the die's accessible name so screen
+  // reader users hear the result too, not just see it.
+  function renderDieFace(value) {
+    diePipsEl.innerHTML = '';
+    DIE_PIPS[value].forEach(function (pos) {
+      var circle = document.createElementNS(svgNS, 'circle');
+      circle.setAttribute('cx', pos[0]);
+      circle.setAttribute('cy', pos[1]);
+      circle.setAttribute('r', 7);
+      circle.setAttribute('class', 'die-pip');
+      diePipsEl.appendChild(circle);
+    });
+    dieBtn.setAttribute('aria-label', 'Die showing ' + value + '. Tap to roll.');
+  }
+
+  var dieRolling = false;
+  var dieTickInterval = null;
+
+  // Tapping the die: for about 700ms, flip through random faces every
+  // 90ms (with a tick sound each time) to read as a tumbling roll, then
+  // settle on one final random value, independent of whatever face the
+  // animation happened to land on, and play a confirming beep. The
+  // hint text spells out the exact number rolled (not just the pips),
+  // so the result is never ambiguous.
+  function rollDie() {
+    if (dieRolling) return;
+    dieRolling = true;
+    dieBtn.classList.add('rolling');
+    dieHintEl.textContent = 'rolling…';
+
+    var ticks = 0;
+    var totalTicks = 8;
+    dieTickInterval = setInterval(function () {
+      renderDieFace(randomDieValue());
+      playDiceTick();
+      ticks++;
+      if (ticks >= totalTicks) {
+        clearInterval(dieTickInterval);
+        dieTickInterval = null;
+        var finalValue = randomDieValue();
+        renderDieFace(finalValue);
+        dieBtn.classList.remove('rolling');
+        dieHintEl.textContent = 'you rolled a ' + finalValue + ' — tap to roll again';
+        dieRolling = false;
+        playBeep();
+      }
+    }, 90);
+  }
+
+  // --- The 30-second timer -----------------------------------------
+  var timerSeconds = 30;
+  var timerInterval = null;
+  var timerRunning = false;
+
+  // Formats timerSeconds as "0:SS" (e.g. 8 -> "0:08") and writes it
+  // into the countdown display.
+  function updateTimerDisplay() {
+    var secs = timerSeconds % 60;
+    timerDisplayEl.textContent = '0:' + (secs < 10 ? '0' : '') + secs;
+  }
+
+  // Counts down once per second via setInterval. When it reaches 0:
+  // stops itself, plays the horn, flashes the display red briefly (the
+  // "times-up" class, removed again a moment later), and re-enables
+  // the Start button for another round.
+  function startTimer() {
+    if (timerRunning) return;
+    timerRunning = true;
+    timerStartBtn.disabled = true;
+    timerStartBtn.textContent = 'Running…';
+
+    timerInterval = setInterval(function () {
+      timerSeconds--;
+      updateTimerDisplay();
+      if (timerSeconds <= 0) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+        timerRunning = false;
+        timerStartBtn.disabled = false;
+        timerStartBtn.textContent = 'Start';
+        playHorn();
+        timerDisplayEl.classList.add('times-up');
+        setTimeout(function () { timerDisplayEl.classList.remove('times-up'); }, 1500);
+      }
+    }, 1000);
+  }
+
+  // Stops any running countdown and puts the display back to 0:30 —
+  // used by both the "Reset" button and by leaving this screen (see
+  // the thirtySecondsBackBtn listener below), so a countdown never
+  // keeps running silently in the background after you've navigated
+  // away from it.
+  function resetTimer() {
+    if (timerInterval) {
+      clearInterval(timerInterval);
+      timerInterval = null;
+    }
+    timerRunning = false;
+    timerSeconds = 30;
+    updateTimerDisplay();
+    timerStartBtn.disabled = false;
+    timerStartBtn.textContent = 'Start';
+  }
+
   // --- Wire everything up ------------------------------------------
   // Every function above only *defines* behavior; nothing actually runs
   // until an event listener connects it to something the player does.
@@ -1436,5 +1854,19 @@
   backBtn.addEventListener('click', function () { showView('games'); });        // game -> mini games
   diceHubBtn.addEventListener('click', function () { showView('dice'); });      // hub -> board game dice
   diceBackBtn.addEventListener('click', function () { showView('menu'); });     // board game dice -> hub
+  thirtySecondsBtn.addEventListener('click', function () { showView('thirtySeconds'); }); // dice -> 30 seconds
+  thirtySecondsBackBtn.addEventListener('click', function () {
+    resetTimer(); // don't let a countdown keep running once you've left the screen
+    showView('dice');
+  });
+
+  muteBtn.addEventListener('click', function () { setMuted(!muted); });
+  dieBtn.addEventListener('click', rollDie);
+  timerStartBtn.addEventListener('click', startTimer);
+  timerResetBtn.addEventListener('click', resetTimer);
+
+  // The die starts blank until the first roll, so give it an initial
+  // face to display (a 1) rather than showing an empty square.
+  renderDieFace(1);
 })(); // end of the IIFE — everything above is now running.
 </script>
