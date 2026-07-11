@@ -212,13 +212,13 @@
     justify-content: center;
   }
 
-  /* This page has six "screens", stacked like a simple menu → submenu
+  /* This page has seven "screens", stacked like a simple menu → submenu
      → destination flow:
        1. #menuView          — the main hub: three tiles (Mini Games /
                                 Board Game Dice / Help).
        2. #miniGamesView     — opened from the "Mini Games" tile; lists
-                                the mini games themselves (Tic-Tac-Toe
-                                and Sudoku).
+                                the mini games themselves (Tic-Tac-Toe,
+                                Sudoku, and Crossword).
        3. #diceView          — opened from the "Board Game Dice" tile;
                                 same idea, lists dice games (just "30
                                 Seconds" for now).
@@ -228,7 +228,9 @@
                                 the "30 Seconds" tile in #diceView.
        6. #sudokuView        — the Sudoku puzzle, opened from the
                                 "Sudoku" tile in #miniGamesView.
-     All six live inside .stage as sibling elements (class="view"),
+       7. #crosswordView     — the Crossword puzzle, opened from the
+                                "Crossword" tile in #miniGamesView.
+     All seven live inside .stage as sibling elements (class="view"),
      but only one is shown at a time — JavaScript adds/removes the
      "active" class to switch between them (see showView() in the JS
      section near the bottom of this file). This is a simple hand-rolled
@@ -486,9 +488,17 @@
   .btn:focus-visible,
   .link-btn:focus-visible,
   .die:focus-visible,
-  .sudoku-numpad button:focus-visible {
+  .sudoku-numpad button:focus-visible,
+  .crossword-clue-list button:focus-visible {
     outline: 2px dashed var(--x-color);
     outline-offset: 3px;
+  }
+  /* Crossword cells are real <input>s sitting edge-to-edge like Sudoku
+     cells, so they need the same inset (negative offset) treatment as
+     .sudoku-cell:focus-visible below, for the same reason. */
+  .crossword-cell input:focus-visible {
+    outline: 2px dashed var(--x-color);
+    outline-offset: -2px;
   }
   /* Sudoku cells sit edge-to-edge with no gap between them, so their
      focus outline is drawn inset (negative offset) instead of the
@@ -896,6 +906,128 @@
   .sudoku-numpad button:hover { border-color: var(--muted-2); }
   .sudoku-numpad button.erase { color: var(--muted); font-size: 0.72rem; letter-spacing: 0.03em; }
 
+  /* --- The Crossword screen ------------------------------------------
+     Like the Sudoku grid, this is plain and precise rather than
+     hand-drawn — but unlike Sudoku's fixed 9x9, this grid's size and
+     shape are different every time a puzzle is generated (some words
+     fit, some don't, so the resulting bounding box varies), so its
+     row/column counts are set inline by JS (see buildCrosswordGrid())
+     rather than fixed here. This block only defines what each *kind*
+     of cell looks like.
+  --------------------------------------------------------------------- */
+
+  .crossword-status {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: var(--muted);
+    text-align: center;
+    min-height: 1.3rem;
+  }
+  .crossword-status.solved { color: var(--o-color); }
+
+  /* Same "every cell draws only its own top/left edge" trick Sudoku's
+     grid uses (see the .sudoku-grid comment) to avoid doubled-up lines
+     between adjacent cells. */
+  .crossword-grid {
+    display: grid;
+    background: var(--surface);
+    border-right: 1px solid var(--chip-border);
+    border-bottom: 1px solid var(--chip-border);
+    border-radius: 0.5rem;
+    overflow: hidden;
+    filter: drop-shadow(0 8px 18px var(--shadow));
+  }
+  .crossword-cell {
+    position: relative;
+    border-top: 1px solid var(--chip-border);
+    border-left: 1px solid var(--chip-border);
+  }
+  /* A square no word ever crosses — the traditional crossword "black
+     square". Filled with --ink (the strongest, most solid color in
+     whichever theme is active) rather than a hardcoded black, so it
+     stays correct in both the light and dark palettes. */
+  .crossword-cell.blocked { background: var(--ink); }
+
+  .crossword-cell-number {
+    position: absolute;
+    top: 1px;
+    left: 2px;
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 0.55rem;
+    color: var(--muted);
+    pointer-events: none;
+  }
+  .crossword-cell input {
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: transparent;
+    text-align: center;
+    text-transform: uppercase;
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-weight: 600;
+    font-size: clamp(0.7rem, 3vw, 1rem);
+    color: var(--ink);
+    padding: 0;
+  }
+  /* Every cell belonging to whichever word is currently selected gets
+     this soft tint; the one exact cell with focus (below) gets a
+     stronger, solid highlight on top of that, so it's always obvious
+     both which word you're filling in and exactly where you are in it. */
+  .crossword-cell.in-word input { background: var(--o-color-soft); }
+  .crossword-cell.selected input {
+    background: var(--o-color);
+    color: var(--surface);
+  }
+
+  /* The two clue lists. auto-fit/minmax collapses this to one column
+     on narrow screens instead of squeezing two side by side. */
+  .crossword-clues {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 1.5rem;
+    text-align: left;
+  }
+  .crossword-clue-list h3 {
+    margin: 0 0 0.5rem;
+    font-family: 'Work Sans', sans-serif;
+    font-weight: 700;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+  }
+  .crossword-clue-list ol {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+  .crossword-clue-list button {
+    appearance: none;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: none;
+    padding: 0.2rem 0;
+    font-family: 'Work Sans', sans-serif;
+    font-size: 0.82rem;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .crossword-clue-list button:hover { color: var(--ink); }
+  /* The clue whose word is currently selected, kept in sync with the
+     .crossword-cell.in-word highlight on the grid — see
+     setCrosswordActiveWord() in the script. */
+  .crossword-clue-list button.active {
+    color: var(--o-color);
+    font-weight: 600;
+  }
+
   footer {
     font-family: 'IBM Plex Mono', ui-monospace, monospace;
     font-size: 0.68rem;
@@ -967,6 +1099,18 @@
       <line x1="2" y1="9" x2="22" y2="9" stroke="currentColor" stroke-width="1.4" />
       <line x1="2" y1="15" x2="22" y2="15" stroke="currentColor" stroke-width="1.4" />
       <rect x="9.8" y="9.8" width="4.4" height="4.4" fill="currentColor" />
+    </symbol>
+    <symbol id="icon-crossword" viewBox="0 0 24 24">
+      <rect x="2" y="2" width="20" height="20" rx="2" fill="none" stroke="currentColor" stroke-width="1.4" />
+      <line x1="9" y1="2" x2="9" y2="22" stroke="currentColor" stroke-width="1.4" />
+      <line x1="15" y1="2" x2="15" y2="22" stroke="currentColor" stroke-width="1.4" />
+      <line x1="2" y1="9" x2="22" y2="9" stroke="currentColor" stroke-width="1.4" />
+      <line x1="2" y1="15" x2="22" y2="15" stroke="currentColor" stroke-width="1.4" />
+      <rect x="9" y="9" width="6" height="6" fill="currentColor" />
+      <rect x="9" y="2" width="6" height="6.2" fill="currentColor" />
+      <rect x="9" y="15.2" width="6" height="6.2" fill="currentColor" />
+      <rect x="2" y="9" width="6.2" height="6" fill="currentColor" />
+      <rect x="15.2" y="9" width="6.2" height="6" fill="currentColor" />
     </symbol>
     <symbol id="icon-chevron" viewBox="0 0 24 24">
       <path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
@@ -1051,6 +1195,14 @@
         <span class="menu-btn-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#icon-sudoku"></use></svg></span>
         <span class="menu-btn-text">
           <span class="menu-btn-label">Sudoku</span>
+        </span>
+        <span class="menu-btn-chevron" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#icon-chevron"></use></svg></span>
+      </button>
+
+      <button type="button" class="menu-btn" id="crosswordBtn">
+        <span class="menu-btn-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#icon-crossword"></use></svg></span>
+        <span class="menu-btn-text">
+          <span class="menu-btn-label">Crossword</span>
         </span>
         <span class="menu-btn-chevron" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#icon-chevron"></use></svg></span>
       </button>
@@ -1262,6 +1414,59 @@
       <button type="button" class="link-btn" id="sudokuClearBtn">Clear my answers</button>
     </div>
   </div>
+
+  <!-- Screen 5: Crossword, opened from the "Crossword" tile in
+       #miniGamesView. Its back link returns to Mini Games, same as
+       Tic-Tac-Toe and Sudoku above. Like Sudoku, this uses a plain grid
+       rather than the Tic-Tac-Toe board's hand-drawn SVG style — but
+       unlike Sudoku's tap-then-numpad input, crossword cells are real
+       text <input>s, since typing with a real (or on-screen mobile)
+       keyboard is the natural way people expect to fill in a crossword. -->
+  <div class="view minimal-view" id="crosswordView">
+    <div class="view-topbar">
+      <button type="button" class="link-btn" id="crosswordBackBtn">&lsaquo; Mini Games</button>
+    </div>
+
+    <div class="screen-heading">
+      <p class="eyebrow">mini games</p>
+      <h2>Crossword</h2>
+    </div>
+
+    <!-- Changes how many words (and how long they're allowed to be) a
+         new puzzle is generated with — see generateCrosswordPuzzle()
+         in the script. -->
+    <div class="mode-toggle" role="group" aria-label="Crossword difficulty">
+      <button type="button" id="crosswordEasyBtn" aria-pressed="false">Easy</button>
+      <button type="button" id="crosswordMediumBtn" aria-pressed="true">Medium</button>
+      <button type="button" id="crosswordHardBtn" aria-pressed="false">Hard</button>
+    </div>
+
+    <p class="crossword-status" id="crosswordStatus">click a clue or a cell to start typing</p>
+
+    <!-- Rebuilt from scratch every time a new puzzle is generated,
+         since the grid's size and shape are different every time
+         (unlike Sudoku's fixed 9x9) — see buildCrosswordGrid(). -->
+    <div class="crossword-grid" id="crosswordGrid" role="group" aria-label="Crossword grid"></div>
+
+    <!-- The two clue lists, filled in by renderCrosswordClues().
+         Clicking a clue selects its word the same as clicking one of
+         its cells would. -->
+    <div class="crossword-clues">
+      <div class="crossword-clue-list">
+        <h3>Across</h3>
+        <ol id="crosswordAcrossClues"></ol>
+      </div>
+      <div class="crossword-clue-list">
+        <h3>Down</h3>
+        <ol id="crosswordDownClues"></ol>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button type="button" class="btn visible" id="crosswordNewBtn">New puzzle</button>
+      <button type="button" class="link-btn" id="crosswordClearBtn">Clear my answers</button>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -1359,7 +1564,7 @@
   // looked up once here (by its id) and kept in a variable, rather than
   // re-querying the document every time it's needed.
 
-  // The six screens (see the .view comment in the style block), keyed
+  // The seven screens (see the .view comment in the style block), keyed
   // by the same short names used throughout showView() below, plus a
   // flag so the board is only ever built once, the first time the
   // player clicks into the game.
@@ -1369,7 +1574,8 @@
     dice: document.getElementById('diceView'),
     thirtySeconds: document.getElementById('thirtySecondsView'),
     game: document.getElementById('gameView'),
-    sudoku: document.getElementById('sudokuView')
+    sudoku: document.getElementById('sudokuView'),
+    crossword: document.getElementById('crosswordView')
   };
   var miniGamesBtn = document.getElementById('miniGamesBtn');
   var miniGamesBackBtn = document.getElementById('miniGamesBackBtn');
@@ -1403,6 +1609,19 @@
   var sudokuEasyBtn = document.getElementById('sudokuEasyBtn');
   var sudokuMediumBtn = document.getElementById('sudokuMediumBtn');
   var sudokuHardBtn = document.getElementById('sudokuHardBtn');
+
+  // --- Crossword screen elements ------------------------------------------
+  var crosswordBtn = document.getElementById('crosswordBtn');
+  var crosswordBackBtn = document.getElementById('crosswordBackBtn');
+  var crosswordGridEl = document.getElementById('crosswordGrid');
+  var crosswordStatusEl = document.getElementById('crosswordStatus');
+  var crosswordAcrossCluesEl = document.getElementById('crosswordAcrossClues');
+  var crosswordDownCluesEl = document.getElementById('crosswordDownClues');
+  var crosswordNewBtn = document.getElementById('crosswordNewBtn');
+  var crosswordClearBtn = document.getElementById('crosswordClearBtn');
+  var crosswordEasyBtn = document.getElementById('crosswordEasyBtn');
+  var crosswordMediumBtn = document.getElementById('crosswordMediumBtn');
+  var crosswordHardBtn = document.getElementById('crosswordHardBtn');
 
   var gridLinesEl = document.getElementById('gridLines');
   var marksEl = document.getElementById('marks');
@@ -1462,6 +1681,13 @@
       sudokuInitialized = true;
       buildSudokuGrid();
       newSudokuPuzzle();
+    }
+    // Crossword builds its own grid from scratch every time a puzzle is
+    // generated (its size varies puzzle to puzzle, unlike Sudoku's
+    // fixed 9x9), so newCrosswordPuzzle() alone covers both jobs here.
+    if (name === 'crossword' && !crosswordInitialized) {
+      crosswordInitialized = true;
+      newCrosswordPuzzle();
     }
   }
 
@@ -2433,6 +2659,605 @@
     newSudokuPuzzle();
   }
 
+  // ============================= Crossword ================================
+  // Unlike Sudoku, there's no purely mathematical structure to generate
+  // a crossword from — it needs actual vocabulary. So this is built
+  // from two pieces: a word bank (below) of {word, clue} pairs, and a
+  // generator that greedily fits a random selection of them together
+  // into a connected grid, the way a person might do it by hand:
+  // place one word, then try to cross each new word over a shared
+  // letter with what's already down, skipping any word that doesn't
+  // fit anywhere.
+
+  // Every word this game can use, however many letters long. Difficulty
+  // (below) only changes which of these are eligible and how many are
+  // used — the words themselves don't change.
+  var CROSSWORD_WORDS = [
+    { word: 'ANT', clue: 'Small insect that lives in colonies' },
+    { word: 'ARM', clue: 'Body part between shoulder and hand' },
+    { word: 'BEE', clue: 'Buzzing insect that makes honey' },
+    { word: 'CAT', clue: 'Common house pet that meows' },
+    { word: 'DOG', clue: 'Loyal pet known for barking' },
+    { word: 'EAR', clue: 'Body part used for hearing' },
+    { word: 'EYE', clue: 'Body part used for seeing' },
+    { word: 'ICE', clue: 'Frozen water' },
+    { word: 'OWL', clue: 'Nocturnal bird known for wisdom' },
+    { word: 'RED', clue: 'Color of a ripe tomato' },
+    { word: 'RUN', clue: 'Move quickly on foot' },
+    { word: 'SEA', clue: 'Large body of salt water' },
+    { word: 'SUN', clue: 'Star at the center of our solar system' },
+    { word: 'TEA', clue: 'Hot drink made from steeped leaves' },
+    { word: 'BEAR', clue: 'Large furry forest animal' },
+    { word: 'BIRD', clue: 'Feathered animal that can fly' },
+    { word: 'BOOK', clue: 'Bound pages you read' },
+    { word: 'CORN', clue: 'Yellow vegetable grown on a cob' },
+    { word: 'DUCK', clue: 'Web-footed bird that quacks' },
+    { word: 'FIRE', clue: 'Hot, glowing flame' },
+    { word: 'FISH', clue: 'Aquatic animal with gills' },
+    { word: 'FROG', clue: 'Hopping amphibian that croaks' },
+    { word: 'GOLD', clue: 'Precious yellow metal' },
+    { word: 'LION', clue: 'King of the jungle' },
+    { word: 'MILK', clue: 'White drink that comes from a cow' },
+    { word: 'MOON', clue: "Earth's only natural satellite" },
+    { word: 'RAIN', clue: 'Water falling from the clouds' },
+    { word: 'RICE', clue: 'Staple grain eaten with many meals' },
+    { word: 'SALT', clue: 'Seasoning found in the sea' },
+    { word: 'SNOW', clue: 'Frozen white precipitation' },
+    { word: 'STAR', clue: 'Bright object seen in the night sky' },
+    { word: 'TREE', clue: 'Tall plant with a trunk and branches' },
+    { word: 'WIND', clue: 'Moving air you can feel but not see' },
+    { word: 'WOLF', clue: 'Wild relative of the dog' },
+    { word: 'APPLE', clue: 'Round fruit that keeps the doctor away' },
+    { word: 'BREAD', clue: 'Baked food made from flour' },
+    { word: 'CLOUD', clue: 'White or grey shape floating in the sky' },
+    { word: 'DANCE', clue: 'Movement to the rhythm of music' },
+    { word: 'DREAM', clue: 'A story your mind tells while you sleep' },
+    { word: 'EARTH', clue: 'The planet we live on' },
+    { word: 'GRAPE', clue: 'Small fruit that grows in bunches' },
+    { word: 'HONEY', clue: 'Sweet substance made by bees' },
+    { word: 'HOUSE', clue: 'A place where people live' },
+    { word: 'LAUGH', clue: "Sound you make when something's funny" },
+    { word: 'LEMON', clue: 'Sour yellow citrus fruit' },
+    { word: 'LIGHT', clue: 'Opposite of darkness' },
+    { word: 'MUSIC', clue: 'Sounds arranged in a pleasing way' },
+    { word: 'NIGHT', clue: 'Time between sunset and sunrise' },
+    { word: 'OCEAN', clue: 'Vast body of salt water' },
+    { word: 'PLANT', clue: 'A living thing that grows in soil' },
+    { word: 'RIVER', clue: 'Flowing body of fresh water' },
+    { word: 'ROBOT', clue: 'Machine that can perform tasks automatically' },
+    { word: 'SMILE', clue: 'Expression showing happiness' },
+    { word: 'STONE', clue: 'A small piece of rock' },
+    { word: 'WATER', clue: 'Clear liquid essential for life' },
+    { word: 'AUTUMN', clue: 'Season between summer and winter' },
+    { word: 'BRIDGE', clue: 'Structure built to cross a river' },
+    { word: 'CASTLE', clue: 'Fortified home of a king or queen' },
+    { word: 'DESERT', clue: 'Dry, sandy region with little rain' },
+    { word: 'DRAGON', clue: 'Mythical fire-breathing creature' },
+    { word: 'ENGINE', clue: 'Machine that powers a vehicle' },
+    { word: 'FAMILY', clue: 'Parents, children, and relatives' },
+    { word: 'FLOWER', clue: 'Colorful part of a plant that blooms' },
+    { word: 'FOREST', clue: 'Large area covered in trees' },
+    { word: 'FRIEND', clue: 'Someone you like and trust' },
+    { word: 'GALAXY', clue: 'Huge collection of stars in space' },
+    { word: 'GARDEN', clue: 'Plot of land for growing plants' },
+    { word: 'ISLAND', clue: 'Land surrounded entirely by water' },
+    { word: 'MEMORY', clue: 'Something you remember' },
+    { word: 'MONKEY', clue: 'Playful primate that swings from trees' },
+    { word: 'MUSEUM', clue: 'Building that displays art or history' },
+    { word: 'PENCIL', clue: 'Writing tool with a graphite core' },
+    { word: 'PIRATE', clue: 'Seafaring outlaw who sails the seas' },
+    { word: 'PLANET', clue: 'A large body orbiting a star' },
+    { word: 'PUZZLE', clue: 'A game that challenges your mind' },
+    { word: 'RABBIT', clue: 'Long-eared hopping animal' },
+    { word: 'ROCKET', clue: 'Vehicle that travels into space' },
+    { word: 'SPIDER', clue: 'Eight-legged creature that spins webs' },
+    { word: 'SPRING', clue: 'Season when flowers begin to bloom' },
+    { word: 'SUMMER', clue: 'Warmest season of the year' },
+    { word: 'TRAVEL', clue: 'To journey from place to place' },
+    { word: 'TURTLE', clue: 'Reptile with a hard protective shell' },
+    { word: 'WINTER', clue: 'Coldest season of the year' },
+    { word: 'WIZARD', clue: 'A magician in a fantasy story' },
+    { word: 'WONDER', clue: 'A feeling of amazement' },
+    { word: 'CAPTAIN', clue: 'Leader of a ship or team' },
+    { word: 'DIAMOND', clue: 'Hardest known natural gemstone' },
+    { word: 'EVENING', clue: 'Time of day just before night' },
+    { word: 'HOLIDAY', clue: 'A day of celebration or rest' },
+    { word: 'JOURNEY', clue: 'A trip from one place to another' },
+    { word: 'KITCHEN', clue: 'Room where meals are prepared' },
+    { word: 'LIBRARY', clue: 'A place full of books to borrow' },
+    { word: 'MORNING', clue: 'Time of day right after sunrise' },
+    { word: 'RAINBOW', clue: 'Colorful arc that appears after rain' },
+    { word: 'CALENDAR', clue: 'Chart that shows the days of the year' },
+    { word: 'CHILDREN', clue: 'Young people — plural of "child"' },
+    { word: 'COMPUTER', clue: 'Electronic device used for many tasks' },
+    { word: 'DINOSAUR', clue: 'Ancient reptile that once ruled the Earth' },
+    { word: 'ELEPHANT', clue: 'Largest land animal, known for its trunk' },
+    { word: 'KANGAROO', clue: 'Hopping marsupial from Australia' },
+    { word: 'MOUNTAIN', clue: 'A very tall landform' },
+    { word: 'SANDWICH', clue: 'Food made between two slices of bread' },
+    { word: 'UNIVERSE', clue: 'All of space and everything in it' },
+    { word: 'ADVENTURE', clue: 'An exciting or daring journey' },
+    { word: 'BUTTERFLY', clue: 'Colorful winged insect that starts as a caterpillar' },
+    { word: 'CHOCOLATE', clue: 'Sweet treat made from cacao' },
+    { word: 'TELESCOPE', clue: 'Instrument used to view distant stars' }
+  ];
+
+  // Fewer, shorter words for Easy; more, longer words allowed for Hard.
+  // maxLength filters which words are eligible at all; wordCount is how
+  // many the generator tries to fit into the grid.
+  var CROSSWORD_DIFFICULTY = {
+    easy: { maxLength: 5, wordCount: 7 },
+    medium: { maxLength: 7, wordCount: 10 },
+    hard: { maxLength: 9, wordCount: 14 }
+  };
+
+  // Is it legal to place `word` starting at (row, col) going in
+  // direction `dir`? `cellAt(r, c)` looks up whatever letter (if any)
+  // is already on the grid at that position (see buildCrosswordLayout()
+  // below for what it actually is). Three rules, same ones real
+  // crossword grids follow:
+  //   1. The cell immediately before the start, and immediately after
+  //      the end, must be empty — otherwise this word would run
+  //      straight into another one with no gap between them.
+  //   2. Every letter of the new word must either land on an empty
+  //      cell, or agree with whatever letter is already there (a
+  //      legitimate crossing).
+  //   3. Wherever the new word lands on an empty cell (i.e. NOT a
+  //      crossing), the cells directly beside it (perpendicular to the
+  //      word's own direction) must also be empty — otherwise the new
+  //      word would run alongside an existing one with no gap, which
+  //      would silently form an unintended extra "word" in the grid.
+  function canPlaceCrosswordWord(cellAt, word, row, col, dir) {
+    var len = word.length;
+    if (dir === 'across') {
+      if (cellAt(row, col - 1) !== null) return false;
+      if (cellAt(row, col + len) !== null) return false;
+    } else {
+      if (cellAt(row - 1, col) !== null) return false;
+      if (cellAt(row + len, col) !== null) return false;
+    }
+
+    var crossed = false;
+    for (var i = 0; i < len; i++) {
+      var r = dir === 'across' ? row : row + i;
+      var c = dir === 'across' ? col + i : col;
+      var existing = cellAt(r, c);
+      if (existing !== null) {
+        if (existing !== word[i]) return false;
+        crossed = true;
+      } else if (dir === 'across') {
+        if (cellAt(r - 1, c) !== null || cellAt(r + 1, c) !== null) return false;
+      } else {
+        if (cellAt(r, c - 1) !== null || cellAt(r, c + 1) !== null) return false;
+      }
+    }
+    return crossed; // must actually connect to what's already placed
+  }
+
+  // Greedily builds one attempt at a layout: places the first (longest)
+  // candidate across at the origin, then for each remaining candidate,
+  // searches every already-placed letter for a spot this word could
+  // legally cross through (in either direction), and — if it finds
+  // any — places it at a random one of them. Words that can't be
+  // placed at all are simply skipped, which is why generateCrossword-
+  // Puzzle() below tries this multiple times and keeps whichever
+  // attempt placed the most words, rather than relying on a single try
+  // to seat every candidate. Stops early once `targetCount` words have
+  // been placed.
+  function buildCrosswordLayout(candidates, targetCount) {
+    var cells = {}; // "row,col" -> letter
+    var placed = [];
+
+    function cellAt(r, c) {
+      var v = cells[r + ',' + c];
+      return v === undefined ? null : v;
+    }
+
+    var first = candidates[0];
+    for (var i = 0; i < first.word.length; i++) {
+      cells['0,' + i] = first.word[i];
+    }
+    placed.push({ word: first.word, clue: first.clue, row: 0, col: 0, dir: 'across' });
+
+    for (var w = 1; w < candidates.length && placed.length < targetCount; w++) {
+      var entry = candidates[w];
+      var word = entry.word;
+      var options = [];
+
+      for (var li = 0; li < word.length; li++) {
+        var letter = word[li];
+        for (var key in cells) {
+          if (cells[key] !== letter) continue;
+          var parts = key.split(',');
+          var r = parseInt(parts[0], 10);
+          var c = parseInt(parts[1], 10);
+
+          var acrossRow = r, acrossCol = c - li;
+          if (canPlaceCrosswordWord(cellAt, word, acrossRow, acrossCol, 'across')) {
+            options.push({ row: acrossRow, col: acrossCol, dir: 'across' });
+          }
+          var downRow = r - li, downCol = c;
+          if (canPlaceCrosswordWord(cellAt, word, downRow, downCol, 'down')) {
+            options.push({ row: downRow, col: downCol, dir: 'down' });
+          }
+        }
+      }
+
+      if (options.length === 0) continue; // no legal spot this attempt — skip it
+
+      var pick = options[Math.floor(Math.random() * options.length)];
+      for (var k = 0; k < word.length; k++) {
+        var rr = pick.dir === 'across' ? pick.row : pick.row + k;
+        var cc = pick.dir === 'across' ? pick.col + k : pick.col;
+        cells[rr + ',' + cc] = word[k];
+      }
+      placed.push({ word: word, clue: entry.clue, row: pick.row, col: pick.col, dir: pick.dir });
+    }
+
+    return { cells: cells, placed: placed };
+  }
+
+  // Converts a raw layout (which may use negative row/column numbers,
+  // since words can extend in any direction from the first one at
+  // "0,0") into a finished, 0-indexed grid ready to render: finds the
+  // bounding box of every filled cell, shifts everything to fit inside
+  // it, then works out each word's clue number. Numbering follows the
+  // usual crossword rule — read every cell top-to-bottom, left-to-
+  // right, and give the next number to any cell that's the start of an
+  // across word, a down word, or both (sharing one number if so).
+  function normalizeCrosswordLayout(raw) {
+    var minRow = Infinity, maxRow = -Infinity, minCol = Infinity, maxCol = -Infinity;
+    Object.keys(raw.cells).forEach(function (key) {
+      var parts = key.split(',');
+      var r = parseInt(parts[0], 10), c = parseInt(parts[1], 10);
+      if (r < minRow) minRow = r;
+      if (r > maxRow) maxRow = r;
+      if (c < minCol) minCol = c;
+      if (c > maxCol) maxCol = c;
+    });
+
+    var rows = maxRow - minRow + 1;
+    var cols = maxCol - minCol + 1;
+
+    var grid = [];
+    var numberGrid = [];
+    for (var r = 0; r < rows; r++) {
+      grid.push(new Array(cols).fill(null));
+      numberGrid.push(new Array(cols).fill(null));
+    }
+    Object.keys(raw.cells).forEach(function (key) {
+      var parts = key.split(',');
+      var r = parseInt(parts[0], 10) - minRow;
+      var c = parseInt(parts[1], 10) - minCol;
+      grid[r][c] = raw.cells[key];
+    });
+
+    var words = raw.placed.map(function (p) {
+      return { word: p.word, clue: p.clue, row: p.row - minRow, col: p.col - minCol, dir: p.dir };
+    });
+
+    var startCells = {};
+    words.forEach(function (w) { startCells[w.row + ',' + w.col] = true; });
+    var sortedStarts = Object.keys(startCells).map(function (key) {
+      var parts = key.split(',');
+      return { row: parseInt(parts[0], 10), col: parseInt(parts[1], 10) };
+    }).sort(function (a, b) { return (a.row - b.row) || (a.col - b.col); });
+
+    var numberByKey = {};
+    sortedStarts.forEach(function (pos, i) {
+      numberByKey[pos.row + ',' + pos.col] = i + 1;
+      numberGrid[pos.row][pos.col] = i + 1;
+    });
+    words.forEach(function (w) { w.number = numberByKey[w.row + ',' + w.col]; });
+
+    var acrossWords = words.filter(function (w) { return w.dir === 'across'; })
+      .sort(function (a, b) { return a.number - b.number; });
+    var downWords = words.filter(function (w) { return w.dir === 'down'; })
+      .sort(function (a, b) { return a.number - b.number; });
+
+    return { rows: rows, cols: cols, grid: grid, numberGrid: numberGrid, acrossWords: acrossWords, downWords: downWords };
+  }
+
+  // Generates one full puzzle at the given difficulty: filters the
+  // word bank down to eligible lengths, then repeatedly shuffles a
+  // fresh candidate pool (twice the target size, so there's slack if
+  // some words don't fit) and hands it to buildCrosswordLayout(),
+  // keeping whichever attempt placed the most words. Stops early once
+  // an attempt places every targeted word — there's no need to keep
+  // trying once the puzzle is already as full as intended.
+  function generateCrosswordPuzzle(difficultyLevel) {
+    var settings = CROSSWORD_DIFFICULTY[difficultyLevel];
+    var pool = CROSSWORD_WORDS.filter(function (w) { return w.word.length <= settings.maxLength; });
+    var poolSize = Math.min(settings.wordCount * 2, pool.length);
+
+    var best = null;
+    for (var attempt = 0; attempt < 15; attempt++) {
+      var candidates = shuffleArray(pool.slice())
+        .sort(function (a, b) { return b.word.length - a.word.length; })
+        .slice(0, poolSize);
+      var layout = buildCrosswordLayout(candidates, settings.wordCount);
+      if (!best || layout.placed.length > best.placed.length) best = layout;
+      if (best.placed.length >= settings.wordCount) break;
+    }
+
+    return normalizeCrosswordLayout(best);
+  }
+
+  // --- Board state, rendering, and interaction ---------------------------
+  var crosswordLayout = null;      // { rows, cols, grid, numberGrid, acrossWords, downWords }
+  var crosswordPlayerGrid = null;  // same shape as crosswordLayout.grid, but what the player has typed
+  var crosswordCellMap = null;     // [row][col] -> { el, input, across: idxOrNull, down: idxOrNull } or null (blocked)
+  var crosswordSelected = null;    // { row, col } of the focused cell
+  var crosswordActiveWord = null;  // { dir: 'across'|'down', index } into acrossWords/downWords
+  var crosswordDifficulty = 'medium';
+  var crosswordInitialized = false;
+
+  // Rebuilds the grid's DOM from crosswordLayout: one element per
+  // cell, either a plain blocked square or an active square containing
+  // a real text <input> (see the HTML comment on #crosswordGrid for
+  // why real inputs are used here instead of Sudoku's tap-then-numpad
+  // approach). Also fills in crosswordCellMap as it goes, since the
+  // interaction functions below need to look up "what word(s) pass
+  // through this cell?" by position.
+  function buildCrosswordGrid() {
+    crosswordGridEl.innerHTML = '';
+    crosswordGridEl.style.gridTemplateColumns = 'repeat(' + crosswordLayout.cols + ', 1fr)';
+    crosswordGridEl.style.gridTemplateRows = 'repeat(' + crosswordLayout.rows + ', 1fr)';
+    crosswordGridEl.style.aspectRatio = crosswordLayout.cols + ' / ' + crosswordLayout.rows;
+
+    // First pass: which cells belong to which across/down word, so the
+    // second pass (building the actual DOM) can look this up per cell.
+    var acrossAt = {}, downAt = {};
+    crosswordLayout.acrossWords.forEach(function (w, index) {
+      for (var i = 0; i < w.word.length; i++) acrossAt[w.row + ',' + (w.col + i)] = index;
+    });
+    crosswordLayout.downWords.forEach(function (w, index) {
+      for (var i = 0; i < w.word.length; i++) downAt[(w.row + i) + ',' + w.col] = index;
+    });
+
+    crosswordCellMap = [];
+    for (var r = 0; r < crosswordLayout.rows; r++) {
+      var rowMap = [];
+      for (var c = 0; c < crosswordLayout.cols; c++) {
+        var letter = crosswordLayout.grid[r][c];
+        var cellEl = document.createElement('div');
+        cellEl.className = 'crossword-cell';
+
+        if (letter === null) {
+          cellEl.classList.add('blocked');
+          cellEl.setAttribute('aria-hidden', 'true');
+          rowMap.push(null);
+        } else {
+          var number = crosswordLayout.numberGrid[r][c];
+          if (number !== null) {
+            var numberEl = document.createElement('span');
+            numberEl.className = 'crossword-cell-number';
+            numberEl.textContent = number;
+            cellEl.appendChild(numberEl);
+          }
+          var input = document.createElement('input');
+          input.type = 'text';
+          input.maxLength = 1;
+          input.autocomplete = 'off';
+          input.setAttribute('aria-label', 'Row ' + (r + 1) + ', column ' + (c + 1));
+          input.dataset.row = r;
+          input.dataset.col = c;
+          (function (row, col) {
+            input.addEventListener('click', function () { selectCrosswordCell(row, col); });
+            input.addEventListener('input', function (e) { onCrosswordCellInput(row, col, e); });
+            input.addEventListener('keydown', function (e) { onCrosswordCellKeydown(row, col, e); });
+          })(r, c);
+          cellEl.appendChild(input);
+          rowMap.push({ el: cellEl, input: input, across: acrossAt[r + ',' + c], down: downAt[r + ',' + c] });
+        }
+        crosswordGridEl.appendChild(cellEl);
+      }
+      crosswordCellMap.push(rowMap);
+    }
+  }
+
+  // Builds the Across/Down clue lists from crosswordLayout. Each clue
+  // is a <button> (not just text) so it's a real, keyboard-reachable
+  // control — clicking one selects that word the same as clicking one
+  // of its cells would (see selectCrosswordClue()).
+  function renderCrosswordClues() {
+    function renderList(listEl, words, dir) {
+      listEl.innerHTML = '';
+      words.forEach(function (w, index) {
+        var li = document.createElement('li');
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = w.number + '. ' + w.clue;
+        btn.dataset.index = index;
+        btn.addEventListener('click', function () { selectCrosswordClue(dir, index); });
+        li.appendChild(btn);
+        listEl.appendChild(li);
+      });
+    }
+    renderList(crosswordAcrossCluesEl, crosswordLayout.acrossWords, 'across');
+    renderList(crosswordDownCluesEl, crosswordLayout.downWords, 'down');
+  }
+
+  // Highlights every cell belonging to the word at acrossWords/
+  // downWords[index] (the ".in-word" tint), marks its matching clue
+  // list entry ".active", and records it as the current
+  // crosswordActiveWord so typing/arrow-keys know which direction to
+  // continue in.
+  function setCrosswordActiveWord(dir, index) {
+    crosswordActiveWord = { dir: dir, index: index };
+    var word = (dir === 'across' ? crosswordLayout.acrossWords : crosswordLayout.downWords)[index];
+
+    crosswordGridEl.querySelectorAll('.in-word').forEach(function (el) { el.classList.remove('in-word'); });
+    crosswordGridEl.querySelectorAll('.selected').forEach(function (el) { el.classList.remove('selected'); });
+    crosswordAcrossCluesEl.querySelectorAll('button.active').forEach(function (el) { el.classList.remove('active'); });
+    crosswordDownCluesEl.querySelectorAll('button.active').forEach(function (el) { el.classList.remove('active'); });
+
+    for (var i = 0; i < word.word.length; i++) {
+      var r = dir === 'across' ? word.row : word.row + i;
+      var c = dir === 'across' ? word.col + i : word.col;
+      crosswordCellMap[r][c].el.classList.add('in-word');
+    }
+    crosswordCellMap[crosswordSelected.row][crosswordSelected.col].el.classList.add('selected');
+
+    var clueListEl = dir === 'across' ? crosswordAcrossCluesEl : crosswordDownCluesEl;
+    var clueBtn = clueListEl.querySelector('button[data-index="' + index + '"]');
+    if (clueBtn) clueBtn.classList.add('active');
+  }
+
+  // Selects a cell by clicking directly on it. If it's the cell that
+  // was already selected, and it belongs to both an across and a down
+  // word, this toggles which of the two is active — the standard way
+  // crossword apps let you disambiguate an intersection cell. Otherwise
+  // it keeps going in whatever direction is already active if this
+  // cell is part of that word, and only falls back to picking a fresh
+  // direction (across if available, else down) if neither applies.
+  function selectCrosswordCell(row, col) {
+    var entry = crosswordCellMap[row] && crosswordCellMap[row][col];
+    if (!entry) return;
+
+    var sameCell = crosswordSelected && crosswordSelected.row === row && crosswordSelected.col === col;
+    var hasAcross = entry.across !== undefined;
+    var hasDown = entry.down !== undefined;
+    var dir;
+    if (sameCell && hasAcross && hasDown) {
+      dir = crosswordActiveWord.dir === 'across' ? 'down' : 'across';
+    } else if (crosswordActiveWord && crosswordActiveWord.dir === 'across' && hasAcross) {
+      dir = 'across';
+    } else if (crosswordActiveWord && crosswordActiveWord.dir === 'down' && hasDown) {
+      dir = 'down';
+    } else {
+      dir = hasAcross ? 'across' : 'down';
+    }
+
+    crosswordSelected = { row: row, col: col };
+    setCrosswordActiveWord(dir, dir === 'across' ? entry.across : entry.down);
+  }
+
+  // Selects a word directly from its clue in the list — always
+  // activates exactly the clicked clue's direction (unlike
+  // selectCrosswordCell(), which tries to preserve whatever direction
+  // was already active), and moves keyboard focus to its first cell.
+  function selectCrosswordClue(dir, index) {
+    var word = (dir === 'across' ? crosswordLayout.acrossWords : crosswordLayout.downWords)[index];
+    crosswordSelected = { row: word.row, col: word.col };
+    setCrosswordActiveWord(dir, index);
+    crosswordCellMap[word.row][word.col].input.focus();
+  }
+
+  // Moves focus to the cell one step away in direction (dRow, dCol), if
+  // it exists and is an active (non-blocked) cell — used by the arrow
+  // keys below.
+  function moveCrosswordFocus(row, col, dRow, dCol) {
+    var next = crosswordCellMap[row + dRow] && crosswordCellMap[row + dRow][col + dCol];
+    if (next) {
+      selectCrosswordCell(row + dRow, col + dCol);
+      next.input.focus();
+    }
+  }
+
+  // Handles typing into a cell: keeps only the last valid A-Z character
+  // typed (so pasting or holding a key can't leave more than one letter
+  // behind), stores it in crosswordPlayerGrid, and — if a letter was
+  // actually entered — advances to the next cell in whichever direction
+  // is currently active, the standard crossword "type and move on" feel.
+  function onCrosswordCellInput(row, col, e) {
+    var input = e.target;
+    var letters = input.value.toUpperCase().replace(/[^A-Z]/g, '');
+    var letter = letters.slice(-1);
+    input.value = letter;
+    crosswordPlayerGrid[row][col] = letter || null;
+
+    if (letter && crosswordActiveWord) {
+      var dRow = crosswordActiveWord.dir === 'down' ? 1 : 0;
+      var dCol = crosswordActiveWord.dir === 'across' ? 1 : 0;
+      moveCrosswordFocus(row, col, dRow, dCol);
+    }
+    checkCrosswordSolved();
+  }
+
+  // Arrow keys move between cells regardless of the active word;
+  // Backspace on an already-empty cell hops back one cell (in whatever
+  // direction is active) and clears that one too — both standard
+  // crossword keyboard conventions.
+  function onCrosswordCellKeydown(row, col, e) {
+    if (e.key === 'ArrowRight') { e.preventDefault(); moveCrosswordFocus(row, col, 0, 1); }
+    else if (e.key === 'ArrowLeft') { e.preventDefault(); moveCrosswordFocus(row, col, 0, -1); }
+    else if (e.key === 'ArrowDown') { e.preventDefault(); moveCrosswordFocus(row, col, 1, 0); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); moveCrosswordFocus(row, col, -1, 0); }
+    else if (e.key === 'Backspace' && !e.target.value && crosswordActiveWord) {
+      var dRow = crosswordActiveWord.dir === 'down' ? -1 : 0;
+      var dCol = crosswordActiveWord.dir === 'across' ? -1 : 0;
+      var prev = crosswordCellMap[row + dRow] && crosswordCellMap[row + dRow][col + dCol];
+      if (prev) {
+        e.preventDefault();
+        prev.input.value = '';
+        crosswordPlayerGrid[row + dRow][col + dCol] = null;
+        selectCrosswordCell(row + dRow, col + dCol);
+        prev.input.focus();
+      }
+    }
+  }
+
+  // The puzzle is solved once every non-blocked cell's player-entered
+  // letter matches the generated solution grid.
+  function checkCrosswordSolved() {
+    for (var r = 0; r < crosswordLayout.rows; r++) {
+      for (var c = 0; c < crosswordLayout.cols; c++) {
+        var solutionLetter = crosswordLayout.grid[r][c];
+        if (solutionLetter === null) continue;
+        if (crosswordPlayerGrid[r][c] !== solutionLetter) return;
+      }
+    }
+    crosswordStatusEl.textContent = 'Solved! Nicely done.';
+    crosswordStatusEl.classList.add('solved');
+    crosswordCellMap.forEach(function (rowMap) {
+      rowMap.forEach(function (entry) { if (entry) entry.input.disabled = true; });
+    });
+  }
+
+  // Generates a fresh puzzle at the current difficulty, rebuilds the
+  // grid and clue lists from scratch, and selects the first across
+  // word so typing can start immediately.
+  function newCrosswordPuzzle() {
+    crosswordLayout = generateCrosswordPuzzle(crosswordDifficulty);
+    crosswordPlayerGrid = crosswordLayout.grid.map(function (row) {
+      return row.map(function () { return null; });
+    });
+    crosswordSelected = null;
+    crosswordActiveWord = null;
+    crosswordStatusEl.textContent = 'click a clue or a cell to start typing';
+    crosswordStatusEl.classList.remove('solved');
+    buildCrosswordGrid();
+    renderCrosswordClues();
+    if (crosswordLayout.acrossWords.length > 0) selectCrosswordClue('across', 0);
+  }
+
+  // Clears every letter the player has typed without generating a new
+  // puzzle — same idea as Sudoku's "Clear my answers".
+  function clearCrosswordAnswers() {
+    for (var r = 0; r < crosswordLayout.rows; r++) {
+      for (var c = 0; c < crosswordLayout.cols; c++) {
+        if (crosswordLayout.grid[r][c] === null) continue;
+        crosswordPlayerGrid[r][c] = null;
+        var entry = crosswordCellMap[r][c];
+        entry.input.value = '';
+        entry.input.disabled = false;
+      }
+    }
+    crosswordStatusEl.textContent = 'click a clue or a cell to start typing';
+    crosswordStatusEl.classList.remove('solved');
+  }
+
+  // Switches Easy/Medium/Hard and starts a fresh puzzle at the new
+  // difficulty — same pattern as Sudoku's setSudokuDifficulty().
+  function setCrosswordDifficulty(newDifficulty) {
+    crosswordDifficulty = newDifficulty;
+    crosswordEasyBtn.setAttribute('aria-pressed', String(crosswordDifficulty === 'easy'));
+    crosswordMediumBtn.setAttribute('aria-pressed', String(crosswordDifficulty === 'medium'));
+    crosswordHardBtn.setAttribute('aria-pressed', String(crosswordDifficulty === 'hard'));
+    newCrosswordPuzzle();
+  }
+
   // --- Wire everything up ------------------------------------------
   // Every function above only *defines* behavior; nothing actually runs
   // until an event listener connects it to something the player does.
@@ -2483,6 +3308,14 @@
     if (!btn) return;
     enterSudokuDigit(parseInt(btn.dataset.value, 10));
   });
+
+  crosswordBtn.addEventListener('click', function () { showView('crossword'); });    // mini games -> crossword
+  crosswordBackBtn.addEventListener('click', function () { showView('games'); });    // crossword -> mini games
+  crosswordNewBtn.addEventListener('click', newCrosswordPuzzle);
+  crosswordClearBtn.addEventListener('click', clearCrosswordAnswers);
+  crosswordEasyBtn.addEventListener('click', function () { if (crosswordDifficulty !== 'easy') setCrosswordDifficulty('easy'); });
+  crosswordMediumBtn.addEventListener('click', function () { if (crosswordDifficulty !== 'medium') setCrosswordDifficulty('medium'); });
+  crosswordHardBtn.addEventListener('click', function () { if (crosswordDifficulty !== 'hard') setCrosswordDifficulty('hard'); });
 
   // The die starts blank until the first roll, so give it an initial
   // face to display (a 0) rather than showing an empty square.
