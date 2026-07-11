@@ -857,6 +857,17 @@
   .sudoku-cell.selected { background: var(--o-color-soft); }
   .sudoku-cell.conflict { color: var(--x-color); }
 
+  /* The "Mexican wave" celebration once a puzzle is solved: each cell
+     briefly hops up and settles back down. On its own this is just a
+     little bounce — what makes it read as a wave is entirely in the
+     JS (see playSudokuWave()), which staggers *when* each cell's copy
+     of this same animation starts, so they don't all bounce at once. */
+  @keyframes sudokuWave {
+    0%, 100% { transform: translateY(0) scale(1); }
+    35% { transform: translateY(-8px) scale(1.2); }
+  }
+  .sudoku-cell.wave { animation: sudokuWave 0.5s ease; }
+
   /* The on-screen number pad used to fill in the selected cell — see
      the .controls comment elsewhere for why a tap-cell-then-tap-number
      flow is used instead of native text inputs (works identically with
@@ -2316,6 +2327,37 @@
     sudokuStatusEl.classList.add('solved');
     sudokuSelected = -1;
     sudokuCellButtons.forEach(function (btn) { btn.disabled = true; });
+    playSudokuWave();
+  }
+
+  // The "Mexican wave" celebration: every cell plays the same little
+  // hop (the .wave class / sudokuWave keyframes in the style block),
+  // but each one starts a little later than its neighbor. `row + col`
+  // is a cell's distance along the top-left-to-bottom-right diagonal
+  // (0 for the top-left corner, up to 16 for the bottom-right one), so
+  // giving every cell a delay proportional to that number makes whole
+  // diagonals hop in sync, one diagonal after the next — the same way
+  // a stadium wave sweeps one section of seats after the next, rather
+  // than everyone standing up at the same instant.
+  function playSudokuWave() {
+    if (reduceMotion) return;
+    var stepDelay = 35; // ms between one diagonal and the next
+    sudokuCellButtons.forEach(function (btn, index) {
+      var row = Math.floor(index / 9);
+      var col = index % 9;
+      btn.style.animationDelay = ((row + col) * stepDelay) + 'ms';
+      btn.classList.add('wave');
+    });
+  }
+
+  // Undoes the wave celebration's per-cell delay/class so a later
+  // puzzle (or clearing this one) starts from a clean slate rather
+  // than carrying over leftover animation state.
+  function resetSudokuWave() {
+    sudokuCellButtons.forEach(function (btn) {
+      btn.classList.remove('wave');
+      btn.style.animationDelay = '';
+    });
   }
 
   // Starts a brand new puzzle at the current difficulty: generates a
@@ -2329,6 +2371,7 @@
     sudokuSelected = -1;
     sudokuStatusEl.textContent = 'tap a cell, then tap a number';
     sudokuStatusEl.classList.remove('solved');
+    resetSudokuWave();
     renderSudokuBoard();
   }
 
@@ -2342,6 +2385,7 @@
     sudokuSelected = -1;
     sudokuStatusEl.textContent = 'tap a cell, then tap a number';
     sudokuStatusEl.classList.remove('solved');
+    resetSudokuWave();
     renderSudokuBoard();
   }
 
