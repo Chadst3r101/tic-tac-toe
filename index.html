@@ -212,13 +212,13 @@
     justify-content: center;
   }
 
-  /* This page has five "screens", stacked like a simple menu → submenu
+  /* This page has six "screens", stacked like a simple menu → submenu
      → destination flow:
        1. #menuView          — the main hub: three tiles (Mini Games /
                                 Board Game Dice / Help).
        2. #miniGamesView     — opened from the "Mini Games" tile; lists
-                                the mini games themselves (just
-                                Tic-Tac-Toe for now).
+                                the mini games themselves (Tic-Tac-Toe
+                                and Sudoku).
        3. #diceView          — opened from the "Board Game Dice" tile;
                                 same idea, lists dice games (just "30
                                 Seconds" for now).
@@ -226,7 +226,9 @@
                                 the "Tic-Tac-Toe" tile in #miniGamesView.
        5. #thirtySecondsView — the 30 Seconds die + timer, opened from
                                 the "30 Seconds" tile in #diceView.
-     All five live inside .stage as sibling elements (class="view"),
+       6. #sudokuView        — the Sudoku puzzle, opened from the
+                                "Sudoku" tile in #miniGamesView.
+     All six live inside .stage as sibling elements (class="view"),
      but only one is shown at a time — JavaScript adds/removes the
      "active" class to switch between them (see showView() in the JS
      section near the bottom of this file). This is a simple hand-rolled
@@ -483,9 +485,18 @@
   .cell:focus-visible,
   .btn:focus-visible,
   .link-btn:focus-visible,
-  .die:focus-visible {
+  .die:focus-visible,
+  .sudoku-numpad button:focus-visible {
     outline: 2px dashed var(--x-color);
     outline-offset: 3px;
+  }
+  /* Sudoku cells sit edge-to-edge with no gap between them, so their
+     focus outline is drawn inset (negative offset) instead of the
+     usual outward offset above — otherwise it would overlap onto the
+     neighboring cell. */
+  .sudoku-cell:focus-visible {
+    outline: 2px dashed var(--x-color);
+    outline-offset: -2px;
   }
 
   /* Row showing whose turn it is: a colored dot + a text message. */
@@ -775,6 +786,103 @@
      permanent state change. */
   .timer-display.times-up { color: var(--x-color); }
 
+  /* --- The Sudoku screen ------------------------------------------------
+     Unlike the Tic-Tac-Toe board's hand-wobbled SVG lines, this grid is
+     drawn with plain, precise CSS borders — Sudoku is a game of exact
+     logic, so a crisp grid suits it better than a hand-drawn one. The
+     color language: a filled-in "given" cell (part of the starting
+     puzzle) shows in --ink and can't be edited; a cell the player typed
+     shows in --o-color; a cell that conflicts with another in its row,
+     column, or 3x3 box shows in --x-color. That's the same X/O accent
+     pair used everywhere else in the site, just repurposed as a
+     "correct so far" / "conflict" pair instead of two players.
+  --------------------------------------------------------------------- */
+
+  .sudoku-status {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: var(--muted);
+    text-align: center;
+    min-height: 1.3rem;
+  }
+  .sudoku-status.solved { color: var(--o-color); }
+
+  /* The 81 cell buttons are created once in JS (see buildSudokuGrid())
+     and live directly in this grid — no extra wrapper per cell. Every
+     cell draws only its own top and left edge (see .sudoku-cell below);
+     the grid itself supplies the missing right/bottom outer edge. That
+     "each shared edge drawn exactly once" approach avoids the doubled-
+     up lines you'd get if every cell drew all four of its own borders. */
+  .sudoku-grid {
+    width: min(88vw, 23rem);
+    aspect-ratio: 1 / 1;
+    display: grid;
+    grid-template-columns: repeat(9, 1fr);
+    grid-template-rows: repeat(9, 1fr);
+    background: var(--surface);
+    border-right: 1px solid var(--chip-border);
+    border-bottom: 1px solid var(--chip-border);
+    border-radius: 0.75rem;
+    overflow: hidden;
+    filter: drop-shadow(0 8px 18px var(--shadow));
+  }
+  .sudoku-cell {
+    appearance: none;
+    border: none;
+    border-top: 1px solid var(--chip-border);
+    border-left: 1px solid var(--chip-border);
+    background: transparent;
+    padding: 0;
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: clamp(0.8rem, 3.4vw, 1.05rem);
+    font-weight: 600;
+    color: var(--o-color);
+    cursor: pointer;
+  }
+  /* A pre-filled starting cell: bolder, in the neutral ink color, and
+     not clickable-to-edit (still focusable/selectable is unnecessary
+     since there's nothing to type over it). */
+  .sudoku-cell.given {
+    color: var(--ink);
+    font-weight: 700;
+    cursor: default;
+  }
+  /* Marks the left edge of every 3rd column and top edge of every 3rd
+     row (except the very first) with a heavier line, splitting the
+     grid into its nine 3x3 boxes — see buildSudokuGrid() for how these
+     classes get assigned. */
+  .sudoku-cell.box-left { border-left-width: 2px; border-left-color: var(--grid-line); }
+  .sudoku-cell.box-top { border-top-width: 2px; border-top-color: var(--grid-line); }
+  .sudoku-cell.selected { background: var(--o-color-soft); }
+  .sudoku-cell.conflict { color: var(--x-color); }
+
+  /* The on-screen number pad used to fill in the selected cell — see
+     the .controls comment elsewhere for why a tap-cell-then-tap-number
+     flow is used instead of native text inputs (works identically with
+     touch, mouse, and keyboard, and needs no per-cell input styling). */
+  .sudoku-numpad {
+    width: min(88vw, 23rem);
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 0.5rem;
+  }
+  .sudoku-numpad button {
+    appearance: none;
+    border: 1px solid var(--chip-border);
+    border-radius: 0.5rem;
+    background: var(--surface);
+    padding: 0.55rem 0;
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-weight: 600;
+    font-size: 1rem;
+    color: var(--ink);
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease;
+  }
+  .sudoku-numpad button:hover { border-color: var(--muted-2); }
+  .sudoku-numpad button.erase { color: var(--muted); font-size: 0.72rem; letter-spacing: 0.03em; }
+
   footer {
     font-family: 'IBM Plex Mono', ui-monospace, monospace;
     font-size: 0.68rem;
@@ -839,6 +947,14 @@
       <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.6" />
       <path d="M12 7v5l3.2 2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
     </symbol>
+    <symbol id="icon-sudoku" viewBox="0 0 24 24">
+      <rect x="2" y="2" width="20" height="20" rx="2" fill="none" stroke="currentColor" stroke-width="1.4" />
+      <line x1="9" y1="2" x2="9" y2="22" stroke="currentColor" stroke-width="1.4" />
+      <line x1="15" y1="2" x2="15" y2="22" stroke="currentColor" stroke-width="1.4" />
+      <line x1="2" y1="9" x2="22" y2="9" stroke="currentColor" stroke-width="1.4" />
+      <line x1="2" y1="15" x2="22" y2="15" stroke="currentColor" stroke-width="1.4" />
+      <rect x="9.8" y="9.8" width="4.4" height="4.4" fill="currentColor" />
+    </symbol>
     <symbol id="icon-chevron" viewBox="0 0 24 24">
       <path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
     </symbol>
@@ -897,8 +1013,8 @@
   </div>
 
   <!-- Screen 2: Mini Games submenu, opened from the "Mini Games" tile
-       above. Only holds one playable title right now; more tiles can
-       be added to its .menu-list the same way later. -->
+       above. More tiles can be added to its .menu-list the same way
+       these two were. -->
   <div class="view minimal-view" id="miniGamesView">
     <div class="view-topbar">
       <button type="button" class="link-btn" id="miniGamesBackBtn">&lsaquo; Menu</button>
@@ -914,6 +1030,14 @@
         <span class="menu-btn-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#icon-tictactoe"></use></svg></span>
         <span class="menu-btn-text">
           <span class="menu-btn-label">Tic-Tac-Toe</span>
+        </span>
+        <span class="menu-btn-chevron" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#icon-chevron"></use></svg></span>
+      </button>
+
+      <button type="button" class="menu-btn" id="sudokuBtn">
+        <span class="menu-btn-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#icon-sudoku"></use></svg></span>
+        <span class="menu-btn-text">
+          <span class="menu-btn-label">Sudoku</span>
         </span>
         <span class="menu-btn-chevron" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#icon-chevron"></use></svg></span>
       </button>
@@ -1065,6 +1189,60 @@
       <button type="button" class="link-btn" id="resetBtn">Reset match</button>
     </div>
   </div>
+
+  <!-- Screen 4: Sudoku, opened from the "Sudoku" tile in #miniGamesView.
+       Its back link returns to the Mini Games submenu, same as
+       Tic-Tac-Toe above. Unlike the hand-drawn Tic-Tac-Toe board, this
+       one is a plain, precise grid — see the CSS comment above
+       .sudoku-grid for why. -->
+  <div class="view minimal-view" id="sudokuView">
+    <div class="view-topbar">
+      <button type="button" class="link-btn" id="sudokuBackBtn">&lsaquo; Mini Games</button>
+    </div>
+
+    <div class="screen-heading">
+      <p class="eyebrow">mini games</p>
+      <h2>Sudoku</h2>
+    </div>
+
+    <!-- Changes how many cells are pre-filled when a new puzzle is
+         generated — see generateSudokuPuzzle() in the script. Switching
+         difficulty starts a fresh puzzle, same as the Tic-Tac-Toe
+         computer's difficulty picker. -->
+    <div class="mode-toggle" role="group" aria-label="Sudoku difficulty">
+      <button type="button" id="sudokuEasyBtn" aria-pressed="false">Easy</button>
+      <button type="button" id="sudokuMediumBtn" aria-pressed="true">Medium</button>
+      <button type="button" id="sudokuHardBtn" aria-pressed="false">Hard</button>
+    </div>
+
+    <p class="sudoku-status" id="sudokuStatus">tap a cell, then tap a number</p>
+
+    <!-- Empty here — all 81 cells are built once in JS the first time
+         this screen is opened (see buildSudokuGrid()), the same lazy-
+         build approach the Tic-Tac-Toe board uses for its 9 cells. -->
+    <div class="sudoku-grid" id="sudokuGrid" role="group" aria-label="Sudoku board"></div>
+
+    <!-- Tap a cell above, then tap a number here to fill it in — see
+         the .sudoku-numpad comment in the style block for why a number
+         pad is used instead of typing directly into each cell. -->
+    <div class="sudoku-numpad" id="sudokuNumpad" role="group" aria-label="Enter a number">
+      <button type="button" data-value="1">1</button>
+      <button type="button" data-value="2">2</button>
+      <button type="button" data-value="3">3</button>
+      <button type="button" data-value="4">4</button>
+      <button type="button" data-value="5">5</button>
+      <button type="button" data-value="6">6</button>
+      <button type="button" data-value="7">7</button>
+      <button type="button" data-value="8">8</button>
+      <button type="button" data-value="9">9</button>
+      <button type="button" class="erase" data-value="0">Erase</button>
+    </div>
+
+    <div class="controls">
+      <button type="button" class="btn visible" id="sudokuNewBtn">New puzzle</button>
+      <button type="button" class="link-btn" id="sudokuClearBtn">Clear my answers</button>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -1162,7 +1340,7 @@
   // looked up once here (by its id) and kept in a variable, rather than
   // re-querying the document every time it's needed.
 
-  // The five screens (see the .view comment in the style block), keyed
+  // The six screens (see the .view comment in the style block), keyed
   // by the same short names used throughout showView() below, plus a
   // flag so the board is only ever built once, the first time the
   // player clicks into the game.
@@ -1171,7 +1349,8 @@
     games: document.getElementById('miniGamesView'),
     dice: document.getElementById('diceView'),
     thirtySeconds: document.getElementById('thirtySecondsView'),
-    game: document.getElementById('gameView')
+    game: document.getElementById('gameView'),
+    sudoku: document.getElementById('sudokuView')
   };
   var miniGamesBtn = document.getElementById('miniGamesBtn');
   var miniGamesBackBtn = document.getElementById('miniGamesBackBtn');
@@ -1192,6 +1371,18 @@
   var timerDisplayEl = document.getElementById('timerDisplay');
   var timerStartBtn = document.getElementById('timerStartBtn');
   var timerResetBtn = document.getElementById('timerResetBtn');
+
+  // --- Sudoku screen elements --------------------------------------------
+  var sudokuBtn = document.getElementById('sudokuBtn');
+  var sudokuBackBtn = document.getElementById('sudokuBackBtn');
+  var sudokuGridEl = document.getElementById('sudokuGrid');
+  var sudokuNumpadEl = document.getElementById('sudokuNumpad');
+  var sudokuStatusEl = document.getElementById('sudokuStatus');
+  var sudokuNewBtn = document.getElementById('sudokuNewBtn');
+  var sudokuClearBtn = document.getElementById('sudokuClearBtn');
+  var sudokuEasyBtn = document.getElementById('sudokuEasyBtn');
+  var sudokuMediumBtn = document.getElementById('sudokuMediumBtn');
+  var sudokuHardBtn = document.getElementById('sudokuHardBtn');
 
   var gridLinesEl = document.getElementById('gridLines');
   var marksEl = document.getElementById('marks');
@@ -1228,10 +1419,11 @@
   }
 
   // Switches screens: hides every view, then shows only the one whose
-  // key matches `name` ('menu', 'games', or 'game' — see the `views`
-  // object above). Whichever screen you leave keeps its state exactly
-  // as it was — e.g. leaving mid-game to check the menu and coming
-  // back resumes the same round, since this never resets anything.
+  // key matches `name` ('menu', 'games', 'game', 'sudoku', ... — see the
+  // `views` object above). Whichever screen you leave keeps its state
+  // exactly as it was — e.g. leaving mid-game to check the menu and
+  // coming back resumes the same round, since this never resets
+  // anything.
   function showView(name) {
     Object.keys(views).forEach(function (key) {
       views[key].classList.toggle('active', key === name);
@@ -1244,6 +1436,12 @@
       buildStaticBoard();
       mode = 'friend';
       resetRound();
+    }
+    // Same lazy-build idea for Sudoku's 81 cells.
+    if (name === 'sudoku' && !sudokuInitialized) {
+      sudokuInitialized = true;
+      buildSudokuGrid();
+      newSudokuPuzzle();
     }
   }
 
@@ -1830,6 +2028,334 @@
     timerStartBtn.textContent = 'Start';
   }
 
+  // ============================== Sudoku ==================================
+  // A full Sudoku implementation: a puzzle generator, a backtracking
+  // solver, and the board interaction on top of it.
+  //
+  // The board is stored the same way the Tic-Tac-Toe board is: one flat
+  // array of 81 numbers (indices 0-80, row-major — 0 is top-left, 80 is
+  // bottom-right), 0 meaning "empty", rather than a 9x9 grid-of-grids.
+
+  // How many cells stay filled in ("givens") when a puzzle is
+  // generated at each difficulty — fewer givens means more empty cells
+  // to reason out, i.e. harder.
+  var SUDOKU_GIVENS = { easy: 40, medium: 32, hard: 26 };
+
+  // For every cell, the list of all other cells that must not share its
+  // value: every other cell in its row, its column, and its 3x3 box.
+  // This is commonly called a cell's "peers" in Sudoku-solving write-ups.
+  // Precomputing this once means every legality check later on is just
+  // "does any peer already have this value?", instead of re-deriving
+  // which row/column/box a cell belongs to on every single check.
+  var SUDOKU_PEERS = (function buildSudokuPeers() {
+    var peers = [];
+    for (var index = 0; index < 81; index++) {
+      var row = Math.floor(index / 9);
+      var col = index % 9;
+      var boxRow = Math.floor(row / 3) * 3;
+      var boxCol = Math.floor(col / 3) * 3;
+      var peerSet = {};
+      var r, c;
+      for (c = 0; c < 9; c++) peerSet[row * 9 + c] = true;   // same row
+      for (r = 0; r < 9; r++) peerSet[r * 9 + col] = true;   // same column
+      for (r = 0; r < 3; r++) {                               // same 3x3 box
+        for (c = 0; c < 3; c++) peerSet[(boxRow + r) * 9 + (boxCol + c)] = true;
+      }
+      delete peerSet[index]; // a cell isn't its own peer
+      peers.push(Object.keys(peerSet).map(Number));
+    }
+    return peers;
+  })();
+
+  // Every "unit" — a row, a column, or a 3x3 box — as a group of 9 cell
+  // indices that must all hold different numbers. Peers (above) answer
+  // "what must this one cell avoid?"; units answer "which cells belong
+  // to the same group?", which is what the conflict-highlighting pass
+  // further down needs (checking a whole group of 9 for a duplicate).
+  var SUDOKU_UNITS = (function buildSudokuUnits() {
+    var units = [];
+    var row, col, box, r, c;
+    for (row = 0; row < 9; row++) {
+      var rowUnit = [];
+      for (col = 0; col < 9; col++) rowUnit.push(row * 9 + col);
+      units.push(rowUnit);
+    }
+    for (col = 0; col < 9; col++) {
+      var colUnit = [];
+      for (row = 0; row < 9; row++) colUnit.push(row * 9 + col);
+      units.push(colUnit);
+    }
+    for (box = 0; box < 9; box++) {
+      var boxUnit = [];
+      var boxRow = Math.floor(box / 3) * 3;
+      var boxCol = (box % 3) * 3;
+      for (r = 0; r < 3; r++) {
+        for (c = 0; c < 3; c++) boxUnit.push((boxRow + r) * 9 + (boxCol + c));
+      }
+      units.push(boxUnit);
+    }
+    return units;
+  })();
+
+  // Is it legal to place `value` at `index` right now? True as long as
+  // none of that cell's peers already hold the same value.
+  function isSudokuMoveLegal(grid, index, value) {
+    var peers = SUDOKU_PEERS[index];
+    for (var i = 0; i < peers.length; i++) {
+      if (grid[peers[i]] === value) return false;
+    }
+    return true;
+  }
+
+  // The standard Fisher-Yates shuffle: walk backwards through the
+  // array, swapping each position with a random earlier-or-equal one.
+  // Used below to randomize both the order candidates are tried in
+  // (so generated solutions vary) and the order cells are removed in
+  // (so puzzles vary).
+  function shuffleArray(arr) {
+    for (var i = arr.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var temp = arr[i];
+      arr[i] = arr[j];
+      arr[j] = temp;
+    }
+    return arr;
+  }
+
+  // Fills every empty (0) cell with a legal value using backtracking:
+  // place a candidate, recurse into the rest of the grid, and if that
+  // doesn't pan out, undo the placement and try the next candidate —
+  // the same "try it, recurse, undo if it fails" idea as the
+  // Tic-Tac-Toe computer's minimax() search, just applied to a grid of
+  // numbers instead of a game tree. With `randomize` on, the 1-9
+  // candidates are shuffled before being tried, which is what makes
+  // generateSolvedSudoku() below produce a different solution each
+  // time instead of always filling the grid the same predictable way.
+  function solveSudoku(grid, randomize) {
+    var index = grid.indexOf(0);
+    if (index === -1) return true; // no empty cells left — solved
+
+    var candidates = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+    if (randomize) shuffleArray(candidates);
+
+    for (var i = 0; i < candidates.length; i++) {
+      var value = candidates[i];
+      if (isSudokuMoveLegal(grid, index, value)) {
+        grid[index] = value;
+        if (solveSudoku(grid, randomize)) return true;
+        grid[index] = 0; // that choice didn't lead anywhere — undo it
+      }
+    }
+    return false; // no candidate worked from here — dead end, backtrack
+  }
+
+  // Counts how many different solutions `grid` has, stopping as soon
+  // as it finds `limit` of them. Used to check a candidate puzzle has
+  // exactly one solution: called with limit=2, so the moment a second
+  // solution turns up, the search gives up immediately — there's no
+  // need to keep counting once we already know it's not unique.
+  function countSudokuSolutions(grid, limit) {
+    var index = grid.indexOf(0);
+    if (index === -1) return 1; // this branch is one complete solution
+
+    var found = 0;
+    for (var value = 1; value <= 9 && found < limit; value++) {
+      if (isSudokuMoveLegal(grid, index, value)) {
+        grid[index] = value;
+        found += countSudokuSolutions(grid, limit - found);
+        grid[index] = 0;
+      }
+    }
+    return found;
+  }
+
+  // Builds one complete, randomly-filled, valid Sudoku solution by
+  // solving an empty grid with randomized candidate order.
+  function generateSolvedSudoku() {
+    var grid = new Array(81).fill(0);
+    solveSudoku(grid, true);
+    return grid;
+  }
+
+  // Builds a playable puzzle at the given difficulty: starts from a
+  // full random solution, then removes cells one at a time (in random
+  // order), keeping each removal only if the puzzle still has exactly
+  // one solution afterward — putting the cell back otherwise. Stops
+  // once the target number of remaining givens for this difficulty is
+  // reached. Returns both the puzzle (with removed cells set to 0) and
+  // the original solution, so the game can display the puzzle now and
+  // check the player's answer against it later.
+  function generateSudokuPuzzle(difficultyLevel) {
+    var solution = generateSolvedSudoku();
+    var puzzle = solution.slice();
+    var targetGivens = SUDOKU_GIVENS[difficultyLevel];
+
+    var order = [];
+    for (var i = 0; i < 81; i++) order.push(i);
+    shuffleArray(order);
+
+    var givensRemaining = 81;
+    for (var j = 0; j < order.length && givensRemaining > targetGivens; j++) {
+      var index = order[j];
+      var previousValue = puzzle[index];
+      puzzle[index] = 0;
+      if (countSudokuSolutions(puzzle.slice(), 2) === 1) {
+        givensRemaining--; // still uniquely solvable — keep it removed
+      } else {
+        puzzle[index] = previousValue; // became ambiguous — put it back
+      }
+    }
+
+    return { puzzle: puzzle, solution: solution };
+  }
+
+  // --- Board state and rendering -----------------------------------
+  var sudokuSolution = null;
+  var sudokuBoard = null;
+  var sudokuGivenMask = null;
+  var sudokuSelected = -1;
+  var sudokuDifficulty = 'medium';
+  var sudokuInitialized = false;
+  var sudokuCellButtons = [];
+
+  // One-time setup: creates the 81 cell buttons and drops them into
+  // the grid in row-major order. Thicker "box-left"/"box-top" borders
+  // are added at the start of every 3rd row/column (except the very
+  // first) to visually split the grid into its nine 3x3 boxes — see
+  // the matching CSS rules for how those classes are drawn.
+  function buildSudokuGrid() {
+    for (var index = 0; index < 81; index++) {
+      var row = Math.floor(index / 9);
+      var col = index % 9;
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'sudoku-cell';
+      if (col % 3 === 0 && col !== 0) btn.classList.add('box-left');
+      if (row % 3 === 0 && row !== 0) btn.classList.add('box-top');
+      btn.dataset.idx = index;
+      btn.addEventListener('click', function (e) {
+        selectSudokuCell(parseInt(e.currentTarget.dataset.idx, 10));
+      });
+      sudokuGridEl.appendChild(btn);
+      sudokuCellButtons.push(btn);
+    }
+  }
+
+  // Redraws all 81 cells from the current sudokuBoard / sudokuGivenMask
+  // / sudokuSelected state. Given cells are real disabled buttons (see
+  // the .sudoku-cell.given comment in the style block) so there's no
+  // need to separately guard against editing them in selectSudokuCell()
+  // below — a disabled button simply never fires a click.
+  function renderSudokuBoard() {
+    for (var index = 0; index < 81; index++) {
+      var btn = sudokuCellButtons[index];
+      var value = sudokuBoard[index];
+      var isGiven = sudokuGivenMask[index];
+      btn.textContent = value === 0 ? '' : String(value);
+      btn.disabled = isGiven;
+      btn.classList.toggle('given', isGiven);
+      btn.classList.toggle('selected', index === sudokuSelected);
+    }
+    refreshSudokuConflicts();
+  }
+
+  // Finds every cell that shares its value with another cell in the
+  // same row, column, or box, and flags all of them with the
+  // "conflict" class — including a "given" cell, if the player's entry
+  // duplicates one, since seeing exactly which given caused the clash
+  // is part of what makes the highlight useful for solving.
+  function refreshSudokuConflicts() {
+    var conflicting = new Array(81).fill(false);
+    SUDOKU_UNITS.forEach(function (unit) {
+      var firstSeenAt = {}; // value -> first index in this unit holding it
+      unit.forEach(function (index) {
+        var value = sudokuBoard[index];
+        if (value === 0) return;
+        if (firstSeenAt[value] !== undefined) {
+          conflicting[firstSeenAt[value]] = true;
+          conflicting[index] = true;
+        } else {
+          firstSeenAt[value] = index;
+        }
+      });
+    });
+    sudokuCellButtons.forEach(function (btn, index) {
+      btn.classList.toggle('conflict', conflicting[index]);
+    });
+  }
+
+  // --- Interaction ---------------------------------------------------
+
+  // Selects a cell so the number pad below knows where to write.
+  // Tapping the already-selected cell deselects it instead.
+  function selectSudokuCell(index) {
+    sudokuSelected = (sudokuSelected === index) ? -1 : index;
+    renderSudokuBoard();
+  }
+
+  // Writes `value` (1-9, or 0 to erase) into the selected cell — called
+  // by the number pad's click handler below — then checks whether the
+  // whole board is now solved.
+  function enterSudokuDigit(value) {
+    if (sudokuSelected === -1) return;
+    sudokuBoard[sudokuSelected] = value;
+    renderSudokuBoard();
+    checkSudokuSolved();
+  }
+
+  // A puzzle is solved once every cell matches the original solution —
+  // simpler than re-deriving "is this a legal, complete Sudoku" from
+  // scratch, since the one true solution was already computed back
+  // when the puzzle was generated.
+  function checkSudokuSolved() {
+    var solved = sudokuBoard.every(function (value, index) {
+      return value === sudokuSolution[index];
+    });
+    if (!solved) return;
+    sudokuStatusEl.textContent = 'Solved! Nicely done.';
+    sudokuStatusEl.classList.add('solved');
+    sudokuSelected = -1;
+    sudokuCellButtons.forEach(function (btn) { btn.disabled = true; });
+  }
+
+  // Starts a brand new puzzle at the current difficulty: generates a
+  // fresh solution + puzzle pair, resets the board and selection, and
+  // re-renders everything from scratch.
+  function newSudokuPuzzle() {
+    var generated = generateSudokuPuzzle(sudokuDifficulty);
+    sudokuSolution = generated.solution;
+    sudokuBoard = generated.puzzle.slice();
+    sudokuGivenMask = generated.puzzle.map(function (value) { return value !== 0; });
+    sudokuSelected = -1;
+    sudokuStatusEl.textContent = 'tap a cell, then tap a number';
+    sudokuStatusEl.classList.remove('solved');
+    renderSudokuBoard();
+  }
+
+  // Clears everything the player has typed, leaving the puzzle's
+  // original givens in place — lets you restart the same puzzle
+  // without generating a whole new one.
+  function clearSudokuAnswers() {
+    for (var index = 0; index < 81; index++) {
+      if (!sudokuGivenMask[index]) sudokuBoard[index] = 0;
+    }
+    sudokuSelected = -1;
+    sudokuStatusEl.textContent = 'tap a cell, then tap a number';
+    sudokuStatusEl.classList.remove('solved');
+    renderSudokuBoard();
+  }
+
+  // Switches Easy/Medium/Hard, updates which toggle button looks
+  // pressed, and starts a fresh puzzle at the new difficulty — same
+  // pattern as the Tic-Tac-Toe computer's setDifficulty().
+  function setSudokuDifficulty(newDifficulty) {
+    sudokuDifficulty = newDifficulty;
+    sudokuEasyBtn.setAttribute('aria-pressed', String(sudokuDifficulty === 'easy'));
+    sudokuMediumBtn.setAttribute('aria-pressed', String(sudokuDifficulty === 'medium'));
+    sudokuHardBtn.setAttribute('aria-pressed', String(sudokuDifficulty === 'hard'));
+    newSudokuPuzzle();
+  }
+
   // --- Wire everything up ------------------------------------------
   // Every function above only *defines* behavior; nothing actually runs
   // until an event listener connects it to something the player does.
@@ -1862,6 +2388,23 @@
   dieBtn.addEventListener('click', rollDie);
   timerStartBtn.addEventListener('click', startTimer);
   timerResetBtn.addEventListener('click', resetTimer);
+
+  sudokuBtn.addEventListener('click', function () { showView('sudoku'); });    // mini games -> sudoku
+  sudokuBackBtn.addEventListener('click', function () { showView('games'); }); // sudoku -> mini games
+  sudokuNewBtn.addEventListener('click', newSudokuPuzzle);
+  sudokuClearBtn.addEventListener('click', clearSudokuAnswers);
+  sudokuEasyBtn.addEventListener('click', function () { if (sudokuDifficulty !== 'easy') setSudokuDifficulty('easy'); });
+  sudokuMediumBtn.addEventListener('click', function () { if (sudokuDifficulty !== 'medium') setSudokuDifficulty('medium'); });
+  sudokuHardBtn.addEventListener('click', function () { if (sudokuDifficulty !== 'hard') setSudokuDifficulty('hard'); });
+  // One listener on the number pad's container instead of ten separate
+  // ones on each button ("event delegation") — a click anywhere in
+  // #sudokuNumpad bubbles up here, and e.target.closest('button') finds
+  // which button (if any) was actually clicked.
+  sudokuNumpadEl.addEventListener('click', function (e) {
+    var btn = e.target.closest('button');
+    if (!btn) return;
+    enterSudokuDigit(parseInt(btn.dataset.value, 10));
+  });
 
   // The die starts blank until the first roll, so give it an initial
   // face to display (a 0) rather than showing an empty square.
