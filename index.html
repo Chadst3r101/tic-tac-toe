@@ -640,6 +640,8 @@
   .controls {
     display: flex;
     align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
     gap: 1.1rem;
     min-height: 2.6rem;
   }
@@ -1249,8 +1251,14 @@
       <button type="button" class="erase" data-value="0">Erase</button>
     </div>
 
+    <!-- "New puzzle" generates a different puzzle at the current
+         difficulty. "Hint" fills in one correct cell for you (see
+         giveSudokuHint()) without touching the rest of the board.
+         "Clear my answers" wipes everything you've typed but keeps
+         this same puzzle's givens. -->
     <div class="controls">
       <button type="button" class="btn visible" id="sudokuNewBtn">New puzzle</button>
+      <button type="button" class="link-btn" id="sudokuHintBtn">Hint</button>
       <button type="button" class="link-btn" id="sudokuClearBtn">Clear my answers</button>
     </div>
   </div>
@@ -1390,6 +1398,7 @@
   var sudokuNumpadEl = document.getElementById('sudokuNumpad');
   var sudokuStatusEl = document.getElementById('sudokuStatus');
   var sudokuNewBtn = document.getElementById('sudokuNewBtn');
+  var sudokuHintBtn = document.getElementById('sudokuHintBtn');
   var sudokuClearBtn = document.getElementById('sudokuClearBtn');
   var sudokuEasyBtn = document.getElementById('sudokuEasyBtn');
   var sudokuMediumBtn = document.getElementById('sudokuMediumBtn');
@@ -2314,6 +2323,27 @@
     checkSudokuSolved();
   }
 
+  // Gives the player a nudge: finds every cell that still needs fixing
+  // (empty, or filled in wrong — comparing against sudokuSolution the
+  // same way checkSudokuSolved() does), picks one at random, fills in
+  // its correct value, and selects it so it's easy to spot. A random
+  // pick rather than always "the next empty cell" means asking for a
+  // hint twice in a row doesn't just reveal the board in reading order.
+  function giveSudokuHint() {
+    var candidates = [];
+    for (var index = 0; index < 81; index++) {
+      if (sudokuGivenMask[index]) continue; // givens are already correct
+      if (sudokuBoard[index] !== sudokuSolution[index]) candidates.push(index);
+    }
+    if (candidates.length === 0) return; // nothing left to hint at
+
+    var chosen = candidates[Math.floor(Math.random() * candidates.length)];
+    sudokuBoard[chosen] = sudokuSolution[chosen];
+    sudokuSelected = chosen;
+    renderSudokuBoard();
+    checkSudokuSolved();
+  }
+
   // A puzzle is solved once every cell matches the original solution —
   // simpler than re-deriving "is this a legal, complete Sudoku" from
   // scratch, since the one true solution was already computed back
@@ -2327,6 +2357,7 @@
     sudokuStatusEl.classList.add('solved');
     sudokuSelected = -1;
     sudokuCellButtons.forEach(function (btn) { btn.disabled = true; });
+    sudokuHintBtn.disabled = true;
     playSudokuWave();
   }
 
@@ -2371,6 +2402,7 @@
     sudokuSelected = -1;
     sudokuStatusEl.textContent = 'tap a cell, then tap a number';
     sudokuStatusEl.classList.remove('solved');
+    sudokuHintBtn.disabled = false;
     resetSudokuWave();
     renderSudokuBoard();
   }
@@ -2385,6 +2417,7 @@
     sudokuSelected = -1;
     sudokuStatusEl.textContent = 'tap a cell, then tap a number';
     sudokuStatusEl.classList.remove('solved');
+    sudokuHintBtn.disabled = false;
     resetSudokuWave();
     renderSudokuBoard();
   }
@@ -2436,6 +2469,7 @@
   sudokuBtn.addEventListener('click', function () { showView('sudoku'); });    // mini games -> sudoku
   sudokuBackBtn.addEventListener('click', function () { showView('games'); }); // sudoku -> mini games
   sudokuNewBtn.addEventListener('click', newSudokuPuzzle);
+  sudokuHintBtn.addEventListener('click', giveSudokuHint);
   sudokuClearBtn.addEventListener('click', clearSudokuAnswers);
   sudokuEasyBtn.addEventListener('click', function () { if (sudokuDifficulty !== 'easy') setSudokuDifficulty('easy'); });
   sudokuMediumBtn.addEventListener('click', function () { if (sudokuDifficulty !== 'medium') setSudokuDifficulty('medium'); });
