@@ -212,13 +212,13 @@
     justify-content: center;
   }
 
-  /* This page has seven "screens", stacked like a simple menu → submenu
+  /* This page has eight "screens", stacked like a simple menu → submenu
      → destination flow:
        1. #menuView          — the main hub: three tiles (Mini Games /
                                 Board Game Dice / Help).
        2. #miniGamesView     — opened from the "Mini Games" tile; lists
                                 the mini games themselves (Tic-Tac-Toe,
-                                Sudoku, and Crossword).
+                                Sudoku, Crossword, and Word Search).
        3. #diceView          — opened from the "Board Game Dice" tile;
                                 same idea, lists dice games (just "30
                                 Seconds" for now).
@@ -230,7 +230,9 @@
                                 "Sudoku" tile in #miniGamesView.
        7. #crosswordView     — the Crossword puzzle, opened from the
                                 "Crossword" tile in #miniGamesView.
-     All seven live inside .stage as sibling elements (class="view"),
+       8. #wordSearchView    — the Word Search puzzle, opened from the
+                                "Word Search" tile in #miniGamesView.
+     All eight live inside .stage as sibling elements (class="view"),
      but only one is shown at a time — JavaScript adds/removes the
      "active" class to switch between them (see showView() in the JS
      section near the bottom of this file). This is a simple hand-rolled
@@ -1028,6 +1030,82 @@
     font-weight: 600;
   }
 
+  /* --- The Word Search screen ------------------------------------------
+     Same plain, precise grid language as Sudoku and Crossword. The
+     color language reuses the same "o-color = good/complete,
+     x-color = active right now" pairing established elsewhere: a word
+     that's been found turns var(--o-color); the letters currently
+     being dragged over (before releasing to check them) turn
+     var(--x-color), same as an "in progress, not yet confirmed" state.
+  --------------------------------------------------------------------- */
+
+  .word-search-status {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: var(--muted);
+    text-align: center;
+    min-height: 1.3rem;
+  }
+  .word-search-status.solved { color: var(--o-color); }
+
+  /* Grid size (rows/columns) is set inline by JS per difficulty — see
+     buildWordSearchGrid() — same reason Crossword's grid does this
+     instead of using a fixed CSS size like Sudoku's 9x9. touch-action:
+     none stops a finger-drag across the letters from also scrolling
+     the page; user-select: none stops the drag from highlighting the
+     letters as ordinary selectable text. */
+  .word-search-grid {
+    width: min(90vw, 24rem);
+    aspect-ratio: 1 / 1;
+    display: grid;
+    background: var(--surface);
+    border-right: 1px solid var(--chip-border);
+    border-bottom: 1px solid var(--chip-border);
+    border-radius: 0.5rem;
+    overflow: hidden;
+    filter: drop-shadow(0 8px 18px var(--shadow));
+    touch-action: none;
+    user-select: none;
+  }
+  .word-search-cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-top: 1px solid var(--chip-border);
+    border-left: 1px solid var(--chip-border);
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-weight: 600;
+    font-size: clamp(0.6rem, 2.6vw, 0.9rem);
+    color: var(--ink);
+    cursor: pointer;
+  }
+  /* Currently being dragged over, not yet released — see
+     setWordSearchSelection() in the script. */
+  .word-search-cell.selecting { background: var(--x-color-soft); }
+  /* Part of a word that's already been found — permanent, unlike
+     .selecting above. */
+  .word-search-cell.found { background: var(--o-color-soft); color: var(--o-color); }
+
+  .word-search-list {
+    width: 100%;
+    max-width: 24rem;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.4rem 1.1rem;
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 0.82rem;
+    color: var(--ink);
+  }
+  .word-search-list li.found {
+    color: var(--muted);
+    text-decoration: line-through;
+  }
+
   footer {
     font-family: 'IBM Plex Mono', ui-monospace, monospace;
     font-size: 0.68rem;
@@ -1111,6 +1189,14 @@
       <rect x="9" y="15.2" width="6" height="6.2" fill="currentColor" />
       <rect x="2" y="9" width="6.2" height="6" fill="currentColor" />
       <rect x="15.2" y="9" width="6.2" height="6" fill="currentColor" />
+    </symbol>
+    <symbol id="icon-wordsearch" viewBox="0 0 24 24">
+      <rect x="2" y="2" width="20" height="20" rx="2" fill="none" stroke="currentColor" stroke-width="1.4" />
+      <line x1="9" y1="2" x2="9" y2="22" stroke="currentColor" stroke-width="1.4" />
+      <line x1="15" y1="2" x2="15" y2="22" stroke="currentColor" stroke-width="1.4" />
+      <line x1="2" y1="9" x2="22" y2="9" stroke="currentColor" stroke-width="1.4" />
+      <line x1="2" y1="15" x2="22" y2="15" stroke="currentColor" stroke-width="1.4" />
+      <line x1="4.5" y1="4.5" x2="19.5" y2="19.5" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" opacity="0.6" />
     </symbol>
     <symbol id="icon-chevron" viewBox="0 0 24 24">
       <path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
@@ -1203,6 +1289,14 @@
         <span class="menu-btn-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#icon-crossword"></use></svg></span>
         <span class="menu-btn-text">
           <span class="menu-btn-label">Crossword</span>
+        </span>
+        <span class="menu-btn-chevron" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#icon-chevron"></use></svg></span>
+      </button>
+
+      <button type="button" class="menu-btn" id="wordSearchBtn">
+        <span class="menu-btn-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#icon-wordsearch"></use></svg></span>
+        <span class="menu-btn-text">
+          <span class="menu-btn-label">Word Search</span>
         </span>
         <span class="menu-btn-chevron" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#icon-chevron"></use></svg></span>
       </button>
@@ -1467,6 +1561,45 @@
       <button type="button" class="link-btn" id="crosswordClearBtn">Clear my answers</button>
     </div>
   </div>
+
+  <!-- Screen 6: Word Search, opened from the "Word Search" tile in
+       #miniGamesView. Its back link returns to Mini Games, same as
+       the other mini games above. Reuses the plain word list from
+       CROSSWORD_WORDS in the script (just the words themselves, not
+       the clues — there's nothing to define here, just find). -->
+  <div class="view minimal-view" id="wordSearchView">
+    <div class="view-topbar">
+      <button type="button" class="link-btn" id="wordSearchBackBtn">&lsaquo; Mini Games</button>
+    </div>
+
+    <div class="screen-heading">
+      <p class="eyebrow">mini games</p>
+      <h2>Word Search</h2>
+    </div>
+
+    <!-- Changes the grid size, how many words are hidden, and which
+         directions they can run in — see generateWordSearchPuzzle()
+         in the script. -->
+    <div class="mode-toggle" role="group" aria-label="Word Search difficulty">
+      <button type="button" id="wordSearchEasyBtn" aria-pressed="false">Easy</button>
+      <button type="button" id="wordSearchMediumBtn" aria-pressed="true">Medium</button>
+      <button type="button" id="wordSearchHardBtn" aria-pressed="false">Hard</button>
+    </div>
+
+    <p class="word-search-status" id="wordSearchStatus">drag across letters to find a word</p>
+
+    <!-- Rebuilt from scratch every new puzzle, since the grid size
+         changes with difficulty — see buildWordSearchGrid(). -->
+    <div class="word-search-grid" id="wordSearchGrid" role="group" aria-label="Word search grid"></div>
+
+    <!-- The words to find, filled in by renderWordSearchList(). Each
+         gets a "found" class (struck through) once located. -->
+    <ul class="word-search-list" id="wordSearchList"></ul>
+
+    <div class="controls">
+      <button type="button" class="btn visible" id="wordSearchNewBtn">New puzzle</button>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -1564,7 +1697,7 @@
   // looked up once here (by its id) and kept in a variable, rather than
   // re-querying the document every time it's needed.
 
-  // The seven screens (see the .view comment in the style block), keyed
+  // The eight screens (see the .view comment in the style block), keyed
   // by the same short names used throughout showView() below, plus a
   // flag so the board is only ever built once, the first time the
   // player clicks into the game.
@@ -1575,7 +1708,8 @@
     thirtySeconds: document.getElementById('thirtySecondsView'),
     game: document.getElementById('gameView'),
     sudoku: document.getElementById('sudokuView'),
-    crossword: document.getElementById('crosswordView')
+    crossword: document.getElementById('crosswordView'),
+    wordSearch: document.getElementById('wordSearchView')
   };
   var miniGamesBtn = document.getElementById('miniGamesBtn');
   var miniGamesBackBtn = document.getElementById('miniGamesBackBtn');
@@ -1622,6 +1756,17 @@
   var crosswordEasyBtn = document.getElementById('crosswordEasyBtn');
   var crosswordMediumBtn = document.getElementById('crosswordMediumBtn');
   var crosswordHardBtn = document.getElementById('crosswordHardBtn');
+
+  // --- Word Search screen elements ----------------------------------------
+  var wordSearchBtn = document.getElementById('wordSearchBtn');
+  var wordSearchBackBtn = document.getElementById('wordSearchBackBtn');
+  var wordSearchGridEl = document.getElementById('wordSearchGrid');
+  var wordSearchStatusEl = document.getElementById('wordSearchStatus');
+  var wordSearchListEl = document.getElementById('wordSearchList');
+  var wordSearchNewBtn = document.getElementById('wordSearchNewBtn');
+  var wordSearchEasyBtn = document.getElementById('wordSearchEasyBtn');
+  var wordSearchMediumBtn = document.getElementById('wordSearchMediumBtn');
+  var wordSearchHardBtn = document.getElementById('wordSearchHardBtn');
 
   var gridLinesEl = document.getElementById('gridLines');
   var marksEl = document.getElementById('marks');
@@ -1688,6 +1833,12 @@
     if (name === 'crossword' && !crosswordInitialized) {
       crosswordInitialized = true;
       newCrosswordPuzzle();
+    }
+    // Same idea for Word Search — its grid size also changes with
+    // difficulty, so newWordSearchPuzzle() covers both jobs.
+    if (name === 'wordSearch' && !wordSearchInitialized) {
+      wordSearchInitialized = true;
+      newWordSearchPuzzle();
     }
   }
 
@@ -3258,6 +3409,281 @@
     newCrosswordPuzzle();
   }
 
+  // ============================ Word Search ===============================
+  // Reuses the same CROSSWORD_WORDS word bank from the Crossword section
+  // above (just the .word text, not the clues — there's nothing to
+  // define here, only find), placed into a square grid of random
+  // letters. Unlike Crossword, words here can freely overlap wherever
+  // their letters already agree, and any leftover empty cells are
+  // simply filled with random letters at the end.
+
+  // Grid size, how many words to hide, the longest word allowed to fit
+  // that grid, and which directions words are allowed to run in.
+  // Directions are [rowStep, colStep] pairs: Easy only allows reading
+  // left-to-right or top-to-bottom (the two most obvious directions);
+  // Medium adds the two forward diagonals; Hard allows all 8,
+  // including right-to-left and bottom-to-top.
+  var WORD_SEARCH_DIFFICULTY = {
+    easy: { size: 9, wordCount: 6, maxLength: 6, directions: [[0, 1], [1, 0]] },
+    medium: { size: 11, wordCount: 8, maxLength: 8, directions: [[0, 1], [1, 0], [1, 1], [1, -1]] },
+    hard: {
+      size: 13, wordCount: 10, maxLength: 9,
+      directions: [[0, 1], [0, -1], [1, 0], [-1, 0], [1, 1], [1, -1], [-1, 1], [-1, -1]]
+    }
+  };
+
+  // Tries up to 200 random (direction, starting point) combinations for
+  // one word, placing it at the first one that both fits inside the
+  // grid and doesn't collide with a different letter already there
+  // (matching letters are fine — that's how two words end up crossing
+  // through the same cell). Returns the list of cells it occupies, or
+  // null if no legal spot was found in 200 tries.
+  function placeWordSearchWord(grid, size, word, directions) {
+    for (var attempt = 0; attempt < 200; attempt++) {
+      var dir = directions[Math.floor(Math.random() * directions.length)];
+      var row = Math.floor(Math.random() * size);
+      var col = Math.floor(Math.random() * size);
+      var endRow = row + dir[0] * (word.length - 1);
+      var endCol = col + dir[1] * (word.length - 1);
+      if (endRow < 0 || endRow >= size || endCol < 0 || endCol >= size) continue;
+
+      var fits = true;
+      for (var i = 0; i < word.length; i++) {
+        var r = row + dir[0] * i, c = col + dir[1] * i;
+        if (grid[r][c] !== null && grid[r][c] !== word[i]) { fits = false; break; }
+      }
+      if (!fits) continue;
+
+      var cells = [];
+      for (var k = 0; k < word.length; k++) {
+        var rr = row + dir[0] * k, cc = col + dir[1] * k;
+        grid[rr][cc] = word[k];
+        cells.push({ row: rr, col: cc });
+      }
+      return cells;
+    }
+    return null; // couldn't find a legal spot in 200 tries — caller skips this word
+  }
+
+  // Generates one puzzle: picks a random, length-eligible subset of
+  // words (more than the target count, for slack — same reasoning as
+  // Crossword's candidate pool), tries to place as many as possible
+  // longest-first, and repeats the whole attempt a few times, keeping
+  // whichever one placed the most words. Finally fills every cell the
+  // words didn't reach with a random letter.
+  function generateWordSearchPuzzle(difficultyLevel) {
+    var settings = WORD_SEARCH_DIFFICULTY[difficultyLevel];
+    var pool = CROSSWORD_WORDS
+      .map(function (entry) { return entry.word; })
+      .filter(function (word) { return word.length <= settings.maxLength; });
+
+    var best = null;
+    for (var attempt = 0; attempt < 10; attempt++) {
+      var candidates = shuffleArray(pool.slice())
+        .sort(function (a, b) { return b.length - a.length; })
+        .slice(0, settings.wordCount * 2);
+
+      var grid = [];
+      for (var r = 0; r < settings.size; r++) grid.push(new Array(settings.size).fill(null));
+
+      var placedWords = [];
+      for (var i = 0; i < candidates.length && placedWords.length < settings.wordCount; i++) {
+        var cells = placeWordSearchWord(grid, settings.size, candidates[i], settings.directions);
+        if (cells) placedWords.push({ word: candidates[i], cells: cells });
+      }
+
+      if (!best || placedWords.length > best.placedWords.length) best = { grid: grid, placedWords: placedWords };
+      if (best.placedWords.length >= settings.wordCount) break;
+    }
+
+    var LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    for (var row = 0; row < settings.size; row++) {
+      for (var col = 0; col < settings.size; col++) {
+        if (best.grid[row][col] === null) {
+          best.grid[row][col] = LETTERS[Math.floor(Math.random() * LETTERS.length)];
+        }
+      }
+    }
+
+    return { size: settings.size, grid: best.grid, words: best.placedWords };
+  }
+
+  // --- Board state, rendering, and interaction ---------------------------
+  var wordSearchPuzzle = null;         // { size, grid, words: [{ word, cells }] }
+  var wordSearchFoundWords = null;     // { WORD: true } for every word found so far
+  var wordSearchCellElements = null;   // [row][col] -> the cell <div>
+  var wordSearchDifficulty = 'medium';
+  var wordSearchInitialized = false;
+  var wordSearchDragging = false;
+  var wordSearchStart = null;          // { row, col } where the current drag began
+  var wordSearchSelectingCells = [];   // cells under the in-progress drag
+
+  // One-time-per-puzzle setup: creates one cell per grid position,
+  // showing its letter. All the actual selection logic lives in the
+  // pointer event handlers wired up in "Wire everything up" below,
+  // which use document.elementFromPoint() to figure out which cell the
+  // pointer is currently over — simpler than attaching a separate
+  // listener to every individual cell.
+  function buildWordSearchGrid() {
+    wordSearchGridEl.innerHTML = '';
+    wordSearchGridEl.style.gridTemplateColumns = 'repeat(' + wordSearchPuzzle.size + ', 1fr)';
+    wordSearchGridEl.style.gridTemplateRows = 'repeat(' + wordSearchPuzzle.size + ', 1fr)';
+
+    wordSearchCellElements = [];
+    for (var r = 0; r < wordSearchPuzzle.size; r++) {
+      var rowEls = [];
+      for (var c = 0; c < wordSearchPuzzle.size; c++) {
+        var cell = document.createElement('div');
+        cell.className = 'word-search-cell';
+        cell.textContent = wordSearchPuzzle.grid[r][c];
+        cell.dataset.row = r;
+        cell.dataset.col = c;
+        wordSearchGridEl.appendChild(cell);
+        rowEls.push(cell);
+      }
+      wordSearchCellElements.push(rowEls);
+    }
+  }
+
+  // Builds the word list, striking through any word already found —
+  // used both for a brand new puzzle and to refresh after a find.
+  function renderWordSearchList() {
+    wordSearchListEl.innerHTML = '';
+    wordSearchPuzzle.words.forEach(function (entry) {
+      var li = document.createElement('li');
+      li.textContent = entry.word;
+      li.dataset.word = entry.word;
+      if (wordSearchFoundWords[entry.word]) li.classList.add('found');
+      wordSearchListEl.appendChild(li);
+    });
+  }
+
+  // Given a start and an end cell, returns every cell in a straight
+  // line between them (inclusive) — horizontal, vertical, or exactly
+  // diagonal — or null if the two cells don't actually line up that
+  // way. This is what lets a slightly wobbly drag still count, as long
+  // as the pointer's *current* cell forms a straight line from the
+  // start (a drag that momentarily wobbles off-line just doesn't
+  // update the selection until it's back on a valid line).
+  function computeWordSearchLine(r0, c0, r1, c1) {
+    var dr = r1 - r0, dc = c1 - c0;
+    if (dr !== 0 && dc !== 0 && Math.abs(dr) !== Math.abs(dc)) return null;
+    var stepR = dr === 0 ? 0 : (dr > 0 ? 1 : -1);
+    var stepC = dc === 0 ? 0 : (dc > 0 ? 1 : -1);
+    var length = Math.max(Math.abs(dr), Math.abs(dc)) + 1;
+    var cells = [];
+    for (var i = 0; i < length; i++) cells.push({ row: r0 + stepR * i, col: c0 + stepC * i });
+    return cells;
+  }
+
+  // Swaps which cells show the in-progress ".selecting" highlight.
+  function setWordSearchSelection(cells) {
+    wordSearchSelectingCells.forEach(function (pos) {
+      wordSearchCellElements[pos.row][pos.col].classList.remove('selecting');
+    });
+    wordSearchSelectingCells = cells || [];
+    wordSearchSelectingCells.forEach(function (pos) {
+      wordSearchCellElements[pos.row][pos.col].classList.add('selecting');
+    });
+  }
+
+  // Finds which grid cell (if any) is under a given screen position —
+  // used by the pointer handlers below, since a drag gesture reports
+  // raw screen coordinates rather than "which element", especially
+  // once the pointer has moved off the element it started on.
+  function wordSearchCellAtPoint(x, y) {
+    var el = document.elementFromPoint(x, y);
+    var cellEl = el && el.closest ? el.closest('.word-search-cell') : null;
+    if (!cellEl) return null;
+    return { row: parseInt(cellEl.dataset.row, 10), col: parseInt(cellEl.dataset.col, 10) };
+  }
+
+  function onWordSearchPointerDown(e) {
+    var pos = wordSearchCellAtPoint(e.clientX, e.clientY);
+    if (!pos) return;
+    wordSearchDragging = true;
+    wordSearchStart = pos;
+    // Keeps sending this pointer's move/up events to the grid even
+    // once it's moved outside any single cell's boundaries.
+    wordSearchGridEl.setPointerCapture(e.pointerId);
+    setWordSearchSelection([pos]);
+  }
+
+  function onWordSearchPointerMove(e) {
+    if (!wordSearchDragging) return;
+    var pos = wordSearchCellAtPoint(e.clientX, e.clientY);
+    if (!pos) return;
+    var line = computeWordSearchLine(wordSearchStart.row, wordSearchStart.col, pos.row, pos.col);
+    if (line) setWordSearchSelection(line);
+  }
+
+  // Releasing the drag: reads off the selected cells' letters (both
+  // forwards and backwards, since a word can be dragged from either
+  // end), and checks whether they spell an unfound word.
+  function onWordSearchPointerUp() {
+    if (!wordSearchDragging) return;
+    wordSearchDragging = false;
+
+    var letters = wordSearchSelectingCells.map(function (pos) {
+      return wordSearchPuzzle.grid[pos.row][pos.col];
+    }).join('');
+    var reversed = letters.split('').reverse().join('');
+
+    var match = wordSearchPuzzle.words.find(function (entry) {
+      return !wordSearchFoundWords[entry.word] && (entry.word === letters || entry.word === reversed);
+    });
+
+    if (match) {
+      wordSearchFoundWords[match.word] = true;
+      wordSearchSelectingCells.forEach(function (pos) {
+        wordSearchCellElements[pos.row][pos.col].classList.add('found');
+      });
+      var li = wordSearchListEl.querySelector('li[data-word="' + match.word + '"]');
+      if (li) li.classList.add('found');
+      checkWordSearchSolved();
+    }
+
+    setWordSearchSelection([]);
+  }
+
+  // If the gesture is interrupted (e.g. the browser cancels it for its
+  // own reasons) just drop the in-progress selection instead of
+  // treating whatever was selected as a real attempt.
+  function onWordSearchPointerCancel() {
+    wordSearchDragging = false;
+    setWordSearchSelection([]);
+  }
+
+  function checkWordSearchSolved() {
+    var allFound = wordSearchPuzzle.words.every(function (entry) {
+      return wordSearchFoundWords[entry.word];
+    });
+    if (!allFound) return;
+    wordSearchStatusEl.textContent = 'Solved! Nicely done.';
+    wordSearchStatusEl.classList.add('solved');
+  }
+
+  // Generates a fresh puzzle at the current difficulty and rebuilds
+  // the grid and word list from scratch.
+  function newWordSearchPuzzle() {
+    wordSearchPuzzle = generateWordSearchPuzzle(wordSearchDifficulty);
+    wordSearchFoundWords = {};
+    wordSearchStatusEl.textContent = 'drag across letters to find a word';
+    wordSearchStatusEl.classList.remove('solved');
+    buildWordSearchGrid();
+    renderWordSearchList();
+  }
+
+  // Switches Easy/Medium/Hard and starts a fresh puzzle at the new
+  // difficulty — same pattern as Sudoku and Crossword.
+  function setWordSearchDifficulty(newDifficulty) {
+    wordSearchDifficulty = newDifficulty;
+    wordSearchEasyBtn.setAttribute('aria-pressed', String(wordSearchDifficulty === 'easy'));
+    wordSearchMediumBtn.setAttribute('aria-pressed', String(wordSearchDifficulty === 'medium'));
+    wordSearchHardBtn.setAttribute('aria-pressed', String(wordSearchDifficulty === 'hard'));
+    newWordSearchPuzzle();
+  }
+
   // --- Wire everything up ------------------------------------------
   // Every function above only *defines* behavior; nothing actually runs
   // until an event listener connects it to something the player does.
@@ -3316,6 +3742,20 @@
   crosswordEasyBtn.addEventListener('click', function () { if (crosswordDifficulty !== 'easy') setCrosswordDifficulty('easy'); });
   crosswordMediumBtn.addEventListener('click', function () { if (crosswordDifficulty !== 'medium') setCrosswordDifficulty('medium'); });
   crosswordHardBtn.addEventListener('click', function () { if (crosswordDifficulty !== 'hard') setCrosswordDifficulty('hard'); });
+
+  wordSearchBtn.addEventListener('click', function () { showView('wordSearch'); }); // mini games -> word search
+  wordSearchBackBtn.addEventListener('click', function () { showView('games'); });  // word search -> mini games
+  wordSearchNewBtn.addEventListener('click', newWordSearchPuzzle);
+  wordSearchEasyBtn.addEventListener('click', function () { if (wordSearchDifficulty !== 'easy') setWordSearchDifficulty('easy'); });
+  wordSearchMediumBtn.addEventListener('click', function () { if (wordSearchDifficulty !== 'medium') setWordSearchDifficulty('medium'); });
+  wordSearchHardBtn.addEventListener('click', function () { if (wordSearchDifficulty !== 'hard') setWordSearchDifficulty('hard'); });
+  // Pointer Events unify mouse, touch, and pen input into one API, so
+  // this covers dragging with a mouse or a finger without needing
+  // separate mousedown/touchstart-style listeners for each.
+  wordSearchGridEl.addEventListener('pointerdown', onWordSearchPointerDown);
+  wordSearchGridEl.addEventListener('pointermove', onWordSearchPointerMove);
+  wordSearchGridEl.addEventListener('pointerup', onWordSearchPointerUp);
+  wordSearchGridEl.addEventListener('pointercancel', onWordSearchPointerCancel);
 
   // The die starts blank until the first roll, so give it an initial
   // face to display (a 0) rather than showing an empty square.
