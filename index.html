@@ -871,16 +871,20 @@
   .sudoku-cell.selected { background: var(--o-color-soft); }
   .sudoku-cell.conflict { color: var(--x-color); }
 
-  /* The "Mexican wave" celebration once a puzzle is solved: each cell
-     briefly hops up and settles back down. On its own this is just a
-     little bounce — what makes it read as a wave is entirely in the
-     JS (see playSudokuWave()), which staggers *when* each cell's copy
-     of this same animation starts, so they don't all bounce at once. */
-  @keyframes sudokuWave {
+  /* The "Mexican wave" celebration played once a puzzle is solved,
+     shared by Sudoku, Crossword, and Word Search: each cell briefly
+     hops up and settles back down. On its own this is just a little
+     bounce — what makes it read as a wave is entirely in the JS (see
+     playWaveCelebration()), which staggers *when* each cell's copy of
+     this same animation starts, so they don't all bounce at once. This
+     ".wave" class is intentionally generic (not scoped to
+     ".sudoku-cell" or any one game's cell class) so any cell element
+     from any of the three games can use it the same way. */
+  @keyframes puzzleWave {
     0%, 100% { transform: translateY(0) scale(1); }
     35% { transform: translateY(-8px) scale(1.2); }
   }
-  .sudoku-cell.wave { animation: sudokuWave 0.5s ease; }
+  .wave { animation: puzzleWave 0.5s ease; }
 
   /* The on-screen number pad used to fill in the selected cell — see
      the .controls comment elsewhere for why a tap-cell-then-tap-number
@@ -2738,35 +2742,45 @@
     playSudokuWave();
   }
 
-  // The "Mexican wave" celebration: every cell plays the same little
-  // hop (the .wave class / sudokuWave keyframes in the style block),
-  // but each one starts a little later than its neighbor. `row + col`
-  // is a cell's distance along the top-left-to-bottom-right diagonal
-  // (0 for the top-left corner, up to 16 for the bottom-right one), so
-  // giving every cell a delay proportional to that number makes whole
-  // diagonals hop in sync, one diagonal after the next — the same way
-  // a stadium wave sweeps one section of seats after the next, rather
-  // than everyone standing up at the same instant.
-  function playSudokuWave() {
+  // The "Mexican wave" celebration, shared by Sudoku, Crossword, and
+  // Word Search (see playCrosswordWave()/playWordSearchWave() further
+  // down): every cell in `cells` (an array of { el, row, col }) plays
+  // the same little hop (the .wave class / puzzleWave keyframes in the
+  // style block), but each one starts a little later than its
+  // neighbor. `row + col` is a cell's distance along the top-left-to-
+  // bottom-right diagonal, so giving every cell a delay proportional
+  // to that number makes whole diagonals hop in sync, one diagonal
+  // after the next — the same way a stadium wave sweeps one section of
+  // seats after the next, rather than everyone standing up at once.
+  function playWaveCelebration(cells) {
     if (reduceMotion) return;
     var stepDelay = 35; // ms between one diagonal and the next
-    sudokuCellButtons.forEach(function (btn, index) {
-      var row = Math.floor(index / 9);
-      var col = index % 9;
-      btn.style.animationDelay = ((row + col) * stepDelay) + 'ms';
-      btn.classList.add('wave');
+    cells.forEach(function (cell) {
+      cell.el.style.animationDelay = ((cell.row + cell.col) * stepDelay) + 'ms';
+      cell.el.classList.add('wave');
     });
   }
 
   // Undoes the wave celebration's per-cell delay/class so a later
   // puzzle (or clearing this one) starts from a clean slate rather
   // than carrying over leftover animation state.
-  function resetSudokuWave() {
-    sudokuCellButtons.forEach(function (btn) {
-      btn.classList.remove('wave');
-      btn.style.animationDelay = '';
+  function resetWaveCelebration(cells) {
+    cells.forEach(function (cell) {
+      cell.el.classList.remove('wave');
+      cell.el.style.animationDelay = '';
     });
   }
+
+  // Builds the { el, row, col } list playWaveCelebration()/
+  // resetWaveCelebration() expect, from Sudoku's flat sudokuCellButtons
+  // array (index = row * 9 + col).
+  function sudokuWaveCells() {
+    return sudokuCellButtons.map(function (btn, index) {
+      return { el: btn, row: Math.floor(index / 9), col: index % 9 };
+    });
+  }
+  function playSudokuWave() { playWaveCelebration(sudokuWaveCells()); }
+  function resetSudokuWave() { resetWaveCelebration(sudokuWaveCells()); }
 
   // Starts a brand new puzzle at the current difficulty: generates a
   // fresh solution + puzzle pair, resets the board and selection, and
@@ -3364,7 +3378,24 @@
     crosswordCellMap.forEach(function (rowMap) {
       rowMap.forEach(function (entry) { if (entry) entry.input.disabled = true; });
     });
+    playCrosswordWave();
   }
+
+  // Builds the { el, row, col } list the shared playWaveCelebration()/
+  // resetWaveCelebration() (see the Sudoku section above) expect, from
+  // crosswordCellMap — skipping blocked cells, which have no element.
+  function crosswordWaveCells() {
+    var cells = [];
+    for (var r = 0; r < crosswordLayout.rows; r++) {
+      for (var c = 0; c < crosswordLayout.cols; c++) {
+        var entry = crosswordCellMap[r][c];
+        if (entry) cells.push({ el: entry.el, row: r, col: c });
+      }
+    }
+    return cells;
+  }
+  function playCrosswordWave() { playWaveCelebration(crosswordWaveCells()); }
+  function resetCrosswordWave() { resetWaveCelebration(crosswordWaveCells()); }
 
   // Generates a fresh puzzle at the current difficulty, rebuilds the
   // grid and clue lists from scratch, and selects the first across
@@ -3397,6 +3428,7 @@
     }
     crosswordStatusEl.textContent = 'click a clue or a cell to start typing';
     crosswordStatusEl.classList.remove('solved');
+    resetCrosswordWave();
   }
 
   // Switches Easy/Medium/Hard and starts a fresh puzzle at the new
@@ -3661,7 +3693,25 @@
     if (!allFound) return;
     wordSearchStatusEl.textContent = 'Solved! Nicely done.';
     wordSearchStatusEl.classList.add('solved');
+    playWordSearchWave();
   }
+
+  // Builds the { el, row, col } list the shared playWaveCelebration()
+  // (see the Sudoku section above) expects, from wordSearchCellElements.
+  // No matching resetWordSearchWave() is needed — unlike Sudoku's
+  // cells, which are built once and reused, buildWordSearchGrid()
+  // recreates every cell from scratch for each new puzzle, so there's
+  // never leftover wave state to clean up.
+  function wordSearchWaveCells() {
+    var cells = [];
+    for (var r = 0; r < wordSearchPuzzle.size; r++) {
+      for (var c = 0; c < wordSearchPuzzle.size; c++) {
+        cells.push({ el: wordSearchCellElements[r][c], row: r, col: c });
+      }
+    }
+    return cells;
+  }
+  function playWordSearchWave() { playWaveCelebration(wordSearchWaveCells()); }
 
   // Generates a fresh puzzle at the current difficulty and rebuilds
   // the grid and word list from scratch.
